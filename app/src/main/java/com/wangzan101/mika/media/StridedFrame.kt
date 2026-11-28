@@ -4,9 +4,9 @@ import android.graphics.Bitmap
 import java.nio.ByteBuffer
 
 /**
- * 把 ImageReader 的一帧(RGBA_8888)拷进按行跨度(rowStride / pixelStride)分配的位图 [target]。
- * 最后一行可能不带对齐填充,缓冲比整块位图短:这时先垫进一块等长的缓冲再拷,不让 copyPixelsFromBuffer 抛异常。
- * [scratch] 是上次垫用的缓冲;返回这次用的(可能是新的),调用方存下来下一帧传回。
+ * Copies one ImageReader frame (RGBA_8888) into a bitmap [target] allocated with the row stride (rowStride / pixelStride).
+ * The last row may carry no alignment padding, making the buffer shorter than the whole bitmap: pad into a buffer of the needed length before copying so copyPixelsFromBuffer does not throw.
+ * [scratch] is the padding buffer from last time; the one used now (possibly new) is returned for the caller to keep and pass back with the next frame.
  */
 fun copyStridedFrame(target: Bitmap, src: ByteBuffer, scratch: ByteBuffer?): ByteBuffer? {
     src.rewind()

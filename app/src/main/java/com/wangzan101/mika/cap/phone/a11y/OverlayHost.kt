@@ -141,10 +141,10 @@ class OverlayHost internal constructor(private val service: ScreenAccessibility)
     }
 
     /**
-     * 加一个包住内容大小的浮层窗口。平时不抢焦点、点不到的地方照常交给下面的 App;
-     * [onOutside] 给了时,在窗口外面按下会通知它(收起卡片用)。[touchable] 为 false 时窗口只画、不接触摸(按在上面等于按在下面的 App 上)。
-     * [allowOffscreen] 为 true 时窗口可以摆到屏幕外、系统不再把它夹回屏内;只给确实要半露在屏外的窗口(胶囊贴边)用,其余浮层保留这层保护。
-     * 加不上(服务已断开、系统不让)时返回 null,不抛错。
+     * Adds an overlay window wrapping its content size. Normally it does not take focus, and untapped areas go to the app below as usual;
+     * when [onOutside] is given, a press outside the window notifies it (used to collapse the card). With [touchable] false the window only draws and takes no touches (pressing it is like pressing the app below).
+     * With [allowOffscreen] true the window may sit off-screen and the system no longer clamps it back; use it only for windows that must really show halfway off-screen (the edge-tucked capsule), and keep the protection for other overlays.
+     * Returns null instead of throwing when it cannot be added (service disconnected, system refuses).
      */
     fun open(
         placement: OverlayPlacement,
@@ -170,7 +170,7 @@ class OverlayHost internal constructor(private val service: ScreenAccessibility)
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                // 胶囊贴边时把整块窗口挪出去只留半圆,要系统别把它夹回屏内
+                // When the capsule tucks to the edge the whole window moves out leaving a half-circle, so tell the system not to clamp it back on-screen
                 (if (allowOffscreen) WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS else 0) or
                 (if (touchable && !injectedGestures.isolated) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) or
                 (if (secure) WindowManager.LayoutParams.FLAG_SECURE else 0),

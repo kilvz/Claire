@@ -13,12 +13,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 加载好的本机识别模型都放这里:每个包(id + 版本)只加载一次,之后常驻;
- * 闲置 [idleMs] 或系统内存紧张([release])时释放,下次用到再加载。
+ * All loaded on-device recognition models live here: each pack (id + version) loads once and then stays resident;
+ * it is released after [idleMs] of disuse or when system memory is tight ([release]), and loaded again on next use.
  *
- * 加载在 [scope] 里跑,不跟着调用方:按下说话时 [prewarm] 开始加载,调用方取消或等超时,加载照样做完留着用。
- * 释放时正在识别的那次不会被拆掉原生对象,而是等它结束再关;那次照常拿到文字,之后再用这个句柄才报 [OnDeviceSttException]。
- * 识别本身也在 [scope] 里跑(见 [Held.transcribe]):原生解码取消不了,调用方的超时要能立刻返回。
+ * Loading runs in [scope], independent of the caller: [prewarm] starts it on press-to-talk, and the load finishes and stays usable even if the caller cancels or times out.
+ * Releasing never tears down the native object under an in-progress recognition; it waits for that call to end before closing. That call still returns text, and only later uses of the handle report [OnDeviceSttException].
+ * Recognition also runs in [scope] (see [Held.transcribe]): native decoding cannot be cancelled, yet a caller timeout must return immediately.
  */
 class OnDeviceEngines(
     private val backends: OnDeviceBackends,
@@ -27,28 +27,28 @@ class OnDeviceEngines(
     private val options: EngineOptions = EngineOptions.default(),
     private val loadDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    /** 一个包的加载:[ready] 完成后就是可用的模型。 */
+    /** Loading one pack: once [ready] completes, the model is usable. */
     private inner class Slot(val version: Int) {
         val ready = CompletableDeferred<Held>()
         @Volatile var held: Held? = null
-        /** 有人等这次加载等到了超时;之后再来的不再干等,直接报超时,直到它真加载完。 */
+        /** Someone timed out waiting for this load; later callers no longer wait it out and report a timeout until it really finishes. */
         @Volatile var timedOut = false
     }
 
     private val lock = Any()
     private val slots = HashMap<String, Slot>()
 
-    /** 提前在后台加载(按下说话时调),不等结果;出错留到 [engine] 时再报。 */
+    /** Loads in the background ahead of time (called on press-to-talk) without waiting; errors surface later at [engine]. */
     fun prewarm(pack: InstalledVoicePack) {
         if (usable(pack)) slot(pack)
     }
 
-    /** 这个包加载好的模型;还没加载就加载,最多等 [OnDeviceTimeout.LOAD_TIMEOUT_MS]。 */
+    /** The loaded model for this pack; loads it if needed, waiting at most [OnDeviceTimeout.LOAD_TIMEOUT_MS]. */
     suspend fun engine(pack: InstalledVoicePack): OnDeviceSttEngine {
         if (!usable(pack)) throw OnDeviceSttException(OnDeviceSttException.Kind.Unsupported, "no backend for ${pack.entry.backend}/${pack.entry.family} on this device")
         val slot = slot(pack)
         val timeout = { OnDeviceSttException(OnDeviceSttException.Kind.Timeout, "loading ${pack.entry.id} took over ${OnDeviceTimeout.LOAD_TIMEOUT_MS} ms") }
-        // 卡住的加载还没做完:不再每次干等一整个上限;它晚些做完了照常用
+        // A stuck load has not finished: stop waiting the full limit every time; once it finishes later it is still usable
         if (slot.timedOut && !slot.ready.isCompleted) throw timeout()
         val held = withTimeoutOrNull(OnDeviceTimeout.LOAD_TIMEOUT_MS) { slot.ready.await() }
             ?: run {
@@ -59,13 +59,13 @@ class OnDeviceEngines(
         return held
     }
 
-    /** 释放所有模型(系统内存紧张时调)。 */
+    /** Releases all models (called when system memory is tight). */
     fun release() {
         val all = synchronized(lock) { slots.values.toList().also { slots.clear() } }
         all.forEach { retire(it, OnDeviceSttException.Kind.OutOfMemory) }
     }
 
-    /** 释放一个包(删除或换版本时调)。 */
+    /** Releases one pack (called on deletion or version change). */
     fun release(packId: String) {
         synchronized(lock) { slots.remove(packId) }?.let { retire(it, OnDeviceSttException.Kind.Missing) }
     }
@@ -73,7 +73,7 @@ class OnDeviceEngines(
     private fun usable(pack: InstalledVoicePack): Boolean =
         backends.find(pack.entry.backend)?.let { it.supports(pack.entry.family) && it.abiSupported() } == true
 
-    /** 当前版本的加载(在做或做完);没有就开始一个。旧版本先释放,不和新版本同时占内存。 */
+    /** The load for the current version (running or done); starts one when absent. The old version is released first so both never hold memory at once. */
     private fun slot(pack: InstalledVoicePack): Slot {
         var stale: Slot? = null
         var created = false
@@ -106,11 +106,11 @@ class OnDeviceEngines(
                 onSuccess = { engine ->
                     val held = Held(pack.entry.id, slot, engine)
                     slot.held = held
-                    // 加载途中被释放了:直接关掉,不留着
+                    // Released while loading: close it right away instead of keeping it
                     if (slot.ready.complete(held)) held.touch() else engine.close()
                 },
                 onFailure = { error ->
-                    // 失败的加载不留:下次用到重新试
+                    // A failed load is not kept: the next use tries again
                     synchronized(lock) { if (slots[pack.entry.id] === slot) slots.remove(pack.entry.id) }
                     slot.ready.completeExceptionally(error)
                 },
@@ -118,32 +118,32 @@ class OnDeviceEngines(
         }
     }
 
-    /** 还在加载的,等它加载完就关;已经加载好的,等正在进行的识别结束再关。 */
+    /** Still loading: close as soon as it finishes. Already loaded: wait for in-progress recognition to end, then close. */
     private fun retire(slot: Slot, kind: OnDeviceSttException.Kind) {
         if (slot.ready.completeExceptionally(OnDeviceSttException(kind, "voice pack released"))) return
         slot.held?.retire(kind)
     }
 
-    /** 闲置到时:没在识别就释放;正在识别的那次结束后会重新计时。 */
+    /** Idle timeout: release when not recognizing; if a recognition is running, the timer restarts after it ends. */
     private fun idle(held: Held) {
         synchronized(lock) {
             if (slots[held.packId] === held.slot && held.retireIfIdle()) slots.remove(held.packId)
         }
     }
 
-    /** 交给调用方的句柄:记着正在进行的识别,释放时等它们结束再关原生模型。 */
+    /** The handle given to callers: tracks in-progress recognition and waits for it to finish before closing the native model on release. */
     private inner class Held(val packId: String, val slot: Slot, private val inner: OnDeviceSttEngine) : OnDeviceSttEngine {
         private var inFlight = 0
-        /** 调用方已经不等、但原生解码还没结束的次数。 */
+        /** How many calls the caller gave up on while native decoding is still running. */
         private var abandoned = 0
         private var retired: OnDeviceSttException.Kind? = null
         private var idleJob: Job? = null
 
         /**
-         * 原生解码会一直占着线程(JNI 调用,取消不了),所以放在 [scope] 里单独跑,调用方只是等它:
-         * 调用方超时或取消就立刻返回,解码在后台跑完。[inFlight] 按解码真正结束算,
-         * 释放或闲置都等它结束才关原生模型。被丢下的解码还没结束时,新的识别直接报超时(换下一个),
-         * 不再排队等同一把锁,也不会一次次占住更多线程。
+         * Native decoding occupies a thread for its whole run (a JNI call that cannot be cancelled), so it runs separately in [scope] and the caller only waits:
+         * a caller timeout or cancellation returns immediately while decoding finishes in the background. [inFlight] counts actual decode completion,
+         * and release or idle shutdown waits for it before closing the native model. While an abandoned decode is still running, a new recognition reports a timeout (to try the next one)
+         * instead of queueing on the same lock, and it never keeps occupying more threads.
          */
         override suspend fun transcribe(pcm: ShortArray, language: String?): String {
             synchronized(this) {
@@ -168,17 +168,17 @@ class OnDeviceEngines(
                 }
                 throw e
             }.getOrThrow()
-            // 解码途中被释放(删除、换版本、内存紧张)也照常交出文字:原生对象等这次解码结束才关,
-            // 后端把解码和关闭排在一起,文字是有效的;只有之后再来的识别才报已释放
+            // Released mid-decode (deletion, version change, memory pressure) still returns text: the native object closes only after this decode ends,
+            // and the backend serialises decode and close, so the text is valid; only later recognitions report that it was released
             return text
         }
 
-        /** 一次识别:调用方有没有丢下它;只在 synchronized(Held) 里读写。 */
+        /** One recognition call and whether the caller abandoned it; read and written only inside synchronized(Held). */
         private inner class Call {
             var gaveUp = false
         }
 
-        /** 真正的解码;错误都装进结果里,不让它从 [scope] 里往外抛。 */
+        /** The actual decode; errors go into the result instead of escaping from [scope]. */
         private suspend fun decode(pcm: ShortArray, language: String?): Result<String> = try {
             Result.success(inner.transcribe(pcm, language))
         } catch (e: CancellationException) {
@@ -188,11 +188,11 @@ class OnDeviceEngines(
         } catch (e: OutOfMemoryError) {
             Result.failure(OnDeviceSttException(OnDeviceSttException.Kind.OutOfMemory, "out of memory transcribing with $packId", e))
         } catch (e: Throwable) {
-            // 模型已经加载成功,解码出意外不是文件损坏:报 Failed,界面只说「请重试」,不让用户重新下载
+            // The model loaded fine, so an unexpected decode error is not file corruption: report Failed, and the UI only offers a retry instead of asking for another download
             Result.failure(OnDeviceSttException(OnDeviceSttException.Kind.Failed, "on-device model $packId failed to transcribe: ${e.message}", e))
         }
 
-        /** 一次解码真正结束(不管调用方还等不等):已释放且没有别的在跑就关原生模型,否则重新计闲置。 */
+        /** A decode really ended (whether or not the caller is still waiting): close the native model if released and nothing else is running, otherwise restart the idle timer. */
         private fun finished(call: Call) {
             val closeNow = synchronized(this) {
                 inFlight--
@@ -209,14 +209,14 @@ class OnDeviceEngines(
 
         fun touch() = synchronized(this) { if (retired == null && inFlight == 0) scheduleIdle() }
 
-        /** 没有正在进行的识别时释放并关掉,返回是否释放了;检查和释放是一步,不会撞上刚开始的识别。 */
+        /** Releases and closes when nothing is recognizing, returning whether it released; check and release are one step, so a just-started recognition cannot race in. */
         fun retireIfIdle(): Boolean {
             synchronized(this) {
                 if (retired != null || inFlight > 0) return false
                 retired = OnDeviceSttException.Kind.OutOfMemory
                 idleJob?.cancel()
             }
-            // 在 scope 里闲置到时调用,原生 close 出错不能往外抛
+            // Called from [scope] on idle timeout; a native close error must not escape
             runCatching { inner.close() }
             return true
         }
@@ -228,13 +228,13 @@ class OnDeviceEngines(
                 idleJob?.cancel()
                 inFlight == 0
             }
-            // 可能在主线程上(onTrimMemory)调用,原生 close 出错不能往外抛
+            // May be called on the main thread (onTrimMemory); a native close error must not escape
             if (closeNow) runCatching { inner.close() }
         }
 
         /**
-         * 不做事:这是共用的模型,调用方 `engine(pack).use {}` 不该把它扔掉。
-         * 释放只经 [OnDeviceEngines.release]、`release(packId)` 和闲置计时。
+         * Does nothing: this is a shared model, so a caller's `engine(pack).use {}` must not throw it away.
+         * Release happens only through [OnDeviceEngines.release], `release(packId)` and the idle timer.
          */
         override fun close() = Unit
 
@@ -252,7 +252,7 @@ class OnDeviceEngines(
     companion object {
         const val IDLE_MS = 5 * 60_000L
 
-        /** App 里共用的一份;`MikaApp.onTrimMemory` 内存紧张时调 [release]。 */
+        /** One shared instance in the app; `MikaApp.onTrimMemory` calls [release] when memory is tight. */
         val shared: OnDeviceEngines by lazy {
             OnDeviceEngines(OnDeviceBackends(), CoroutineScope(SupervisorJob() + Dispatchers.Default))
         }

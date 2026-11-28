@@ -3,10 +3,10 @@ package com.wangzan101.mika.settings.ui
 import androidx.annotation.StringRes
 import java.text.Normalizer
 
-/** 搜索跳往的模型子页。 */
+/** A model subpage that search can jump to. */
 enum class SettingsModelRoute { Usage, Speech, Voice, CallMode, VoiceServices, Image, Video }
 
-/** 搜索结果点开后去哪:设置里的一个子页(可选定位到页内某一项),或交给设置外面打开的页面与弹窗。 */
+/** Where a search result goes when opened: a settings subpage (optionally focused on one item), or a page or dialog opened outside settings. */
 internal sealed interface SettingsDestination {
     data class Page(val page: SettingsPage, val item: String? = null) : SettingsDestination
     data object Models : SettingsDestination
@@ -23,33 +23,33 @@ internal sealed interface SettingsDestination {
     data object About : SettingsDestination
 }
 
-/** 只在某种能力或开关在时才出现的入口;和设置里对应那一行的显示条件一一对应。 */
+/** An entry that exists only when some capability or switch is present; it matches the visibility condition of the corresponding settings row one-to-one. */
 internal enum class SettingsRequirement {
-    /** 系统版本够内置助手用(「恢复与修复」「兼容性自检」)。 */
+    /** The system version supports the built-in assistant ("Recovery and repair", "Compatibility self-check"). */
     Recovery,
-    /** 这台手机支持文件与计算环境。 */
+    /** This phone supports the files and compute environment. */
     Sandbox,
-    /** 外部 MCP 服务器设置接进来了。 */
+    /** External MCP server settings are wired in. */
     McpServers,
-    /** 手机上有 su。 */
+    /** su is available on the phone. */
     Root,
-    /** 调试版与性能测试版才有的开发者选项。 */
+    /** Developer options present only in debug and performance-test builds. */
     Developer,
-    /** 「个人助手设为首屏」打开着。 */
+    /** "Personal assistant as home screen" is on. */
     PersonalStart,
     Personas,
     Memory,
-    /** 接入了模型下的子页路由。 */
+    /** Subpage routes under Models are wired in. */
     ModelSubPages,
-    /** 实验开关「同时进行的任务」打开着。 */
+    /** The "concurrent tasks" experiment is on. */
     ParallelTasks,
-    /** Android 16+ 的实时任务通知。 */
+    /** Live task notifications on Android 16+. */
     LiveTaskUpdates,
 }
 
 /**
- * 一条搜索条目:稳定的 [id]、点开去的 [destination]、标题和它所在位置(组名、上级页)的字符串资源,
- * 以及辅助匹配的同义选项资源([aliases])。只存资源编号,显示与匹配时才按当前界面语言取字,换语言不用重建。
+ * One search entry: a stable [id], the [destination] it opens, string resources for its title and its location (group name, parent page),
+ * plus synonym resources for better matching ([aliases]). Only resource ids are stored; text is resolved in the current UI language when showing or matching, so no rebuild is needed on a language change.
  */
 internal data class SettingsSearchEntry(
     val id: String,
@@ -60,7 +60,7 @@ internal data class SettingsSearchEntry(
     val aliases: List<Int> = emptyList(),
 )
 
-/** 一条条目换成当前语言后的样子:[path] 是「组 › 上级页」连起来的一行。 */
+/** One entry rendered in the current language: [path] is the "group › parent page" line. */
 internal data class SettingsSearchItem(
     val entry: SettingsSearchEntry,
     val title: String,
@@ -68,7 +68,7 @@ internal data class SettingsSearchItem(
     val aliases: List<String> = emptyList(),
 )
 
-/** 一条命中:标题和位置里各自要高亮的区间(下标指向原文)。 */
+/** One match: the ranges to highlight in the title and location (indices into the source text). */
 internal data class SettingsSearchHit(
     val item: SettingsSearchItem,
     val titleMatches: List<IntRange>,
@@ -76,10 +76,10 @@ internal data class SettingsSearchHit(
 )
 
 /**
- * 匹配与排序:查询按空白切成词,每个词都要出现在标题、位置或同义词里。
- * 排序看每个词落在哪:标题开头、标题里某个词的开头、标题中间、只在位置里、只在同义词里,依次靠后;
- * 同分时标题短的在前,再按登记顺序。
- * 比较前把大小写和拉丁字母上的附加符号去掉(越南语、土耳其语、西葡语不打声调也找得到),其他文字原样比较。
+ * Matching and ranking: the query is split on whitespace and every word must appear in the title, location or synonyms.
+ * Ranking looks at where each word lands: start of the title, start of a word in the title, middle of the title, only in the location, only in synonyms, progressively later;
+ * ties go to the shorter title, then to registration order.
+ * Before comparing, case and Latin diacritics are stripped (Vietnamese, Turkish, Spanish and Portuguese are found without tone marks); other scripts compare as-is.
  */
 internal object SettingsSearch {
     fun search(items: List<SettingsSearchItem>, query: String): List<SettingsSearchHit> {
@@ -118,7 +118,7 @@ internal object SettingsSearch {
         return false
     }
 
-    /** [words] 在 [text] 里出现的每一处,重叠或相接的合并成一段。 */
+    /** Every occurrence of [words] in [text], merging overlapping or adjacent ones into one range. */
     private fun ranges(text: String, words: List<String>): List<IntRange> {
         val found = buildList {
             for (w in words) {
@@ -138,7 +138,7 @@ internal object SettingsSearch {
         return merged
     }
 
-    /** 逐字折叠成小写、去掉拉丁字母的附加符号;长度不变,命中的下标可以直接用在原文上。 */
+    /** Folds character by character to lowercase and strips Latin diacritics; the length is unchanged so match indices apply directly to the original text. */
     fun fold(text: String): String = buildString(text.length) { for (c in text) append(foldChar(c)) }
 
     private fun foldChar(c: Char): Char {

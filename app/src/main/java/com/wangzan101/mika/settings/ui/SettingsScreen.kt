@@ -379,6 +379,7 @@ fun SettingsScreen(
         SettingsPage.AppAccess -> AppAccessScreen(onBack = back)
         SettingsPage.SmsLogin -> SmsLoginSettingsScreen(onBack = back)
         SettingsPage.Wechat -> WechatSettingsScreen(wechat, onBack = back)
+        SettingsPage.Telegram -> TelegramSettingsScreen(telegram, onBack = back)
         SettingsPage.PhoneOps -> PhoneOpsScreen(
             status, androidRelease, onProblem,
             onRepair = { onFix(Fix.RepairPhoneHelper) }, onUnpair = { onFix(Fix.UnpairPhoneHelper) }, onBack = back,

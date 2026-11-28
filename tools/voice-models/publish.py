@@ -235,7 +235,7 @@ def upload_args(tag):
         "--prerelease",
         "--latest=false",
         "--title", f"Voice models ({tag})",
-        "--notes", "Offline speech-recognition model files for Mika. Not an app release; "
+        "--notes", "Offline speech-recognition model files for Claire. Not an app release; "
         "the app downloads these by the hashes in its bundled catalog.json.",
     ]
     return argv

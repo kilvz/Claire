@@ -3,34 +3,34 @@ package com.wangzan101.mika.voice.ondevice
 import com.wangzan101.mika.i18n.AppLanguage
 import java.util.Locale
 
-/** 语音识别语言标签和离线模型语言代码之间的对应,以及按界面语言推荐语音包。 */
+/** Mapping between speech-recognition language tags and offline model language codes, plus voice-pack recommendations per UI language. */
 object OnDeviceLanguage {
 
-    /** 一些模型(Whisper)还用旧代码:希伯来语 iw、爪哇语 jw。 */
+    /** Some models (Whisper) still use legacy codes: iw for Hebrew and jw for Javanese. */
     private val modelAliases = mapOf("he" to "iw", "jv" to "jw")
 
-    /** 语言标签里的语言部分(去掉文字体系、地区),旧代码换成现行代码:`zh-Hans-CN` → `zh`,`in-ID` → `id`。 */
+    /** The language part of a tag (without script or region), with legacy codes replaced by current ones: `zh-Hans-CN` → `zh`, `in-ID` → `id`. */
     fun languagePart(speechTag: String?): String? {
         if (speechTag.isNullOrBlank()) return null
         return Locale.forLanguageTag(speechTag).language.takeIf { it.isNotEmpty() }?.let(AppLanguage::modernCode)
     }
 
-    /** 给模型用的语言代码;模型不支持这种语言或没给语言时返回 null,表示让模型自己判断。 */
+    /** The language code to give the model; null when the model does not support it or no language was given, meaning the model decides. */
     fun pick(speechTag: String?, languages: List<String>): String? {
         val code = languagePart(speechTag) ?: return null
         if (code in languages) return code
         return modelAliases[code]?.takeIf { it in languages }
     }
 
-    /** 按界面语言推荐的语音包;跟随系统时按 [system] 换算成支持的某种界面语言(不支持的落英文)。 */
+    /** The voice pack recommended for a UI language; when following the system, [system] is resolved to a supported UI language (unsupported ones fall back to English). */
     fun recommended(catalog: VoicePackCatalog, app: AppLanguage, system: Locale = Locale.getDefault()): VoicePackEntry? {
         val tag = (if (app == AppLanguage.System) appLanguageFor(system) else app).tag ?: return null
         return catalog.packs.firstOrNull { tag in it.recommendedFor }
     }
 
     /**
-     * [system] 对应的界面语言,和 [AppLanguage.resolved] 跟随系统时的结果一致,但不需要 Context、不依赖 ICU:
-     * 中文没写文字体系时,台湾、香港、澳门按繁体,其余按简体。
+     * The UI language for [system], matching [AppLanguage.resolved] when following the system, but without a Context or ICU:
+     * when Chinese names no script, Taiwan, Hong Kong and Macao map to traditional and everything else to simplified.
      */
     internal fun appLanguageFor(system: Locale): AppLanguage =
         AppLanguage.fromTag(system.toLanguageTag()) { tag ->

@@ -14,7 +14,7 @@ Offline speech-recognition model files for the app, pinned to fixed HuggingFace 
 
 Checks the pins against HuggingFace's LFS records for the commit, then downloads anything missing
 into `<cache>/<packId>/<fileName>` (via `.part`, renamed only when size and SHA-256 match). Files
-already in the cache are re-hashed and kept if they match. About 900 MB.
+already in the cache are re-hashed and kept if they match. About 160 MB for the curated Whisper Base pack.
 
 ## Regenerate the catalog
 
@@ -26,9 +26,9 @@ fail if the committed catalog is out of date.
 
 ## Upload (maintainer, once after merge)
 
-    python3 tools/voice-models/publish.py upload --tag voice-models-v1
+    python3 tools/voice-models/publish.py upload --tag voice-models-1
 
-Creates the `voice-models-v1` GitHub release as a **pre-release, never latest**
+Creates the `voice-models-1` GitHub release as a **pre-release, never latest**
 (`gh release create --prerelease --latest=false`) and uploads every file as `<packId>--<fileName>`.
 It refuses a tag other than the one in the catalog and refuses if that release exists and is not a
 pre-release. Needs `gh` signed in with write access. Add `--clobber` to replace existing assets.

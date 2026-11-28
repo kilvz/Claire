@@ -6,24 +6,24 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
 /**
- * 下载地址的白名单,App 更新和语音包共用。地址只能是「官方地址」本身,或「内置/用户添加的镜像前缀 + 官方地址」。
- * 镜像本身仍由用户信任;下载完照样校验大小、摘要(更新包还验签名),地址放宽不会让别的文件装进来。
+ * Download URL allowlist shared by app updates and voice packs. A URL must be the official address itself, or a built-in/user-added mirror prefix plus the official address.
+ * Mirrors are still trusted by the user; size and digest are still verified after download (updates also verify a signature), so widening addresses cannot install other files.
  *
- * - 更新包([suffix] 为 `.apk`):官方地址只能是 Mika 仓库的 HTTPS 发布附件。
- * - 语音包([suffix] 为空):官方地址是清单给出的 Release 地址或上游地址,调用方传入这个文件的精确地址。
- *   Release 地址同样是 Mika 仓库的发布附件;上游地址只认 HuggingFace 固定提交(`/resolve/<提交>/`),
- *   以及清单里单独写明、同样固定提交的 GitHub 原始文件(许可证原文)。镜像只镜像 GitHub 发布附件。
+ * - App updates ([suffix] is `.apk`): the official address must be an HTTPS release asset of the Claire repository.
+ * - Voice packs (empty [suffix]): the official address is the release or upstream address from the manifest, and the caller passes this file's exact address.
+ *   The release address is likewise a Claire repository asset; upstream addresses accept only pinned HuggingFace commits (`/resolve/<commit>/`)
+ * and GitHub raw files (license texts) listed separately in the manifest at pinned commits. Mirrors only mirror GitHub release assets.
  */
 object DownloadUrls {
     private val release = "${MikaLinks.RELEASES}/download/".toHttpUrl()
     private val commit = "[0-9a-f]{40}"
-    /** 上游主机和它的固定提交路径形式:`/<作者>/<仓库>/resolve/<提交>/…`、`/<作者>/<仓库>/<提交>/…`。 */
+    /** Upstream hosts and their pinned-commit path forms: `/<owner>/<repo>/resolve/<commit>/…` and `/<owner>/<repo>/<commit>/…`. */
     private val upstream = mapOf(
         "huggingface.co" to Regex("/[^/]+/[^/]+/resolve/$commit/.+"),
         "raw.githubusercontent.com" to Regex("/[^/]+/[^/]+/$commit/.+"),
     )
 
-    /** [url] 是 Mika 仓库的 HTTPS 发布附件,且以 [suffix] 结尾(不分大小写;为空不限)。 */
+    /** [url] is an HTTPS release asset of the Claire repository ending in [suffix] (case-insensitive; empty means any). */
     fun requireRelease(url: String, suffix: String?) {
         val parsed = url.toHttpUrl()
         requireHttps(parsed)
@@ -33,9 +33,9 @@ object DownloadUrls {
     }
 
     /**
-     * [url] 只能是 [official] 本身,或 [mirrors] 里某个前缀 + [official]。
-     * [suffix] 为 `.apk` 时是更新包的规则;为空时是语音包的规则,[official] 可以是 Release 或上游地址。
-     * 不合格抛 [IllegalArgumentException]。
+     * [url] must be [official] itself, or some prefix from [mirrors] plus [official].
+     * [suffix] `.apk` applies the update rules; empty applies the voice-pack rules, where [official] may be a release or an upstream address.
+     * Throws [IllegalArgumentException] when invalid.
      */
     fun requireTrusted(url: String, official: String, mirrors: List<UpdateMirror>, suffix: String?) {
         if (url == official) {
@@ -43,7 +43,7 @@ object DownloadUrls {
             return
         }
         require(mirrors.any { url == it.prefix + official }) { "not an official or configured mirror URL" }
-        // 更新包的官方地址调用方已先验过;语音包有两种官方地址,镜像只能套在 Release 地址上。
+        // The caller has already checked the official update address; voice packs have two kinds of official address, and mirrors may only wrap the release one.
         if (suffix == null) requireRelease(official, null)
         val parsed = url.toHttpUrl()
         require(parsed.isHttps)

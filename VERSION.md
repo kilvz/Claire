@@ -3,8 +3,8 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.8.0 (versionCode 78)
-- **Base version:** upstream Mika 0.1.52, merged through commit `d0a515665`
+- **Claire version:** 2.9.0 (versionCode 79)
+- **Base version:** upstream Mika, merged through commit `644d3d2f2`
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
   to it).
@@ -195,6 +195,17 @@ recorded base version.
   (optionally `token|chatId`) and the bot is saved automatically, no
   manual token entry. A token alone fills the token field; the chat ID
   is still asked for. CameraX + ML Kit barcode scanning.
+
+- 2.9.0: merges the latest upstream Mika (through `644d3d2f2`) and
+  adopts its offline voice-pack system. Voice input can run wholly on the
+  phone with a downloaded Whisper Base pack for English and Indonesian,
+  with download, file import, mirrors, checksum verification and an Auto
+  fallback when the system recognizer is unusable. The catalog is curated
+  to that one pack. Live/streaming on-device transcription is absent in
+  this release and returns in 2.10. Also: settings search finds rows inside
+  pages and scrolls to them, conversation branches copy generated media,
+  a conversation's main model applies to its tasks, model-group retries are
+  bounded, and capsule drag plus stock lock-screen PIN detection are fixed.
 
 - 2.8.0: merges the latest upstream Mika. Voice input and read-aloud
   can now use backup models in order, share the chat provider's key pool,

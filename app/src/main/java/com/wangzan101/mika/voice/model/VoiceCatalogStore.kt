@@ -103,7 +103,7 @@ class VoiceCatalogStore(
         }
     }
 
-    /** 装好一个语音包:本机服务(第一次时)和这个包的模型一次写进快照。已有的同名模型按新版本覆盖。 */
+    /** Installs a voice pack: the on-device service (on first use) and this pack's model are written into the snapshot together. An existing model with the same name is replaced by the new version. */
     @Synchronized
     fun installVoicePack(entry: VoicePackEntry) {
         val model = OnDeviceCatalog.model(entry)
@@ -121,8 +121,8 @@ class VoiceCatalogStore(
     }
 
     /**
-     * 启动时补登记:文件装着、快照里却没有模型的语音包(上次进程在提交和登记之间被杀)。
-     * 只加缺的模型(第一次时连同本机服务),选择、备援链一概不动;什么都不缺,或快照读不出来时不写。
+     * Registers on startup: packs whose files are installed but whose model is absent from the snapshot (the last process was killed between commit and registration).
+     * It only adds missing models (with the on-device service on first use) and never touches the selection or fallback chains; it writes nothing when nothing is missing or the snapshot cannot be read.
      */
     @Synchronized
     fun restoreVoicePacks(entries: List<VoicePackEntry>) {
@@ -138,9 +138,9 @@ class VoiceCatalogStore(
     }
 
     /**
-     * 用户删掉一个语音包:删它的模型,备援链里有它的照 [deleteModel] 去掉。
-     * 和 [deleteModel] 有一处故意不同:语音输入选中的是它时回到「自动」,不是「关闭」。
-     * 删模型设成关闭,是为了不悄悄换成要花钱的服务商;「自动」只用手机自带识别或别的本机语音包,不花钱、不出手机。
+     * The user deletes a voice pack: delete its model, and remove it from fallback chains as [deleteModel] does.
+     * One deliberate difference from [deleteModel]: when voice input had it selected, the selection returns to "Auto", not "Off".
+     * Deleting a model sets the selection to Off so it never silently switches to a paid provider; "Auto" only uses built-in recognition or another on-device pack, which costs nothing and stays on the phone.
      */
     @Synchronized
     fun removeVoicePack(packId: String) {

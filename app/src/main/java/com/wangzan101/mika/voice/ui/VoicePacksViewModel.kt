@@ -34,7 +34,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * 语音包卡片的一张。[progress] 只在下载中、或上次下载失败(还没装上)时有;[importing] 是正在从文件导入。
+ * One voice-pack card. [progress] is present only while downloading or after a failed download (not yet installed); [importing] means an import from files is running.
  */
 data class VoicePackCard(
     val entry: VoicePackEntry,
@@ -44,30 +44,30 @@ data class VoicePackCard(
     val importing: Boolean = false,
 )
 
-/** 下载前要用户确认的事。 */
+/** Something the user must confirm before downloading. */
 sealed interface VoicePackPrompt {
-    /** 按流量计费的网络:写明大小,用户确认再下。 */
+    /** Metered network: state the size and download only after the user confirms. */
     data class Metered(val entry: VoicePackEntry, val bytes: Long) : VoicePackPrompt
 }
 
-/** 卡片上方的一句结果提示(最新的一条)。 */
+/** The one-line result notice above the cards (the latest one). */
 sealed interface VoicePackNotice {
     data class NoSpace(val needed: Long, val free: Long) : VoicePackNotice
     data object Unsupported : VoicePackNotice
-    /** 已经有下载或导入在进行,或一个可用的来源都没有。 */
+    /** A download or import is already running, or no source is usable. */
     data object NotStarted : VoicePackNotice
     data class Imported(val result: ImportResult) : VoicePackNotice
     data object DeleteFailed : VoicePackNotice
     data object Copied : VoicePackNotice
-    /** 「通过镜像下载」开关没存上。 */
+    /** The "download through mirrors" switch could not be saved. */
     data object MirrorSaveFailed : VoicePackNotice
 }
 
-/** 语音包卡片要用到的安装操作;App 里是 [VoicePackInstaller] 加 [VoicePackStore],测试换成假的。 */
+/** Install operations the cards need; in the app these are [VoicePackInstaller] plus [VoicePackStore], replaced by fakes in tests. */
 interface VoicePackOps {
-    /** 清单里的包(当前版本认得的引擎和模型族)。 */
+    /** Packs from the manifest (engines and model families this build knows). */
     val packs: List<VoicePackEntry>
-    /** 这台设备能不能跑这个包(引擎认这个模型族、处理器架构支持)。 */
+    /** Whether this device can run the pack (the engine knows the family and the CPU architecture is supported). */
     fun runnable(entry: VoicePackEntry): Boolean
     fun status(entry: VoicePackEntry): VoicePackStatus
     fun preflight(entry: VoicePackEntry): Preflight
@@ -77,17 +77,17 @@ interface VoicePackOps {
     suspend fun delete(entry: VoicePackEntry)
     suspend fun import(entry: VoicePackEntry, inputs: List<ImportInput>): ImportResult
     fun downloadUrls(entry: VoicePackEntry): String
-    /** 下载先走镜像(和关于页「使用镜像下载」是同一个设置,App 更新和语音包共用)。 */
+    /** Download through mirrors first (the same setting as "Use mirrors for downloads" on the About page, shared by app updates and voice packs). */
     val mirrorEnabled: StateFlow<Boolean>
-    /** 改这个开关;没存上返回 false。会写文件,不要在主线程调。 */
+    /** Change this switch; returns false if it could not be saved. Writes a file, so do not call it on the main thread. */
     fun setMirrorEnabled(on: Boolean): Boolean
 }
 
 /**
- * 设置里「离线语音包」一节的状态和动作。[recommended] 是推荐给当前界面语言的包(见 [OnDeviceLanguage.recommended]),
- * 排在最前。设备一个包都跑不了时 [visible] 为 false,整节不显示。
- * 下载只在用户点按时开始:[download] 先过 [VoicePackOps.preflight],空间不够只提示,按流量计费先问([prompt])。
- * 卡片的状态看文件(不是推送来的):下载进度一变、导入删除做完、[refresh](页面回到前台)时重算,算在 [io] 上。
+ * State and actions for the "Offline voice packs" section in settings. [recommended] is the pack recommended for the current UI language (see [OnDeviceLanguage.recommended])
+ * and is listed first. When no pack can run on the device, [visible] is false and the whole section is hidden.
+ * Downloads start only when the user taps: [download] goes through [VoicePackOps.preflight] first, a lack of space is only reported, and metered networks ask first ([prompt]).
+ * Card status is derived from files rather than pushed: it is recomputed on every progress change, after import or deletion, and on [refresh] (the page returning to the foreground), on [io].
  */
 class VoicePacksViewModel(
     private val ops: VoicePackOps,
@@ -123,14 +123,14 @@ class VoicePacksViewModel(
             val p = progress[i]
             val shown = when (p.phase) {
                 DownloadPhase.Downloading, DownloadPhase.Paused -> p
-                // 下载失败:装上之前一直提示,可以重试
+                // Failed download: keep showing it until installed, and allow a retry
                 DownloadPhase.Failed -> p.takeIf { status != VoicePackStatus.Installed }
                 DownloadPhase.Idle, DownloadPhase.Ready -> null
             }
             VoicePackCard(entry, status, shown, entry.id == recommended?.id, importing = entry.id in busy)
         }
 
-    /** 页面回到前台时调:文件可能在别处被删了、装上了。 */
+    /** Called when the page returns to the foreground: files may have been deleted or installed elsewhere. */
     fun refresh() = tick.update { it + 1 }
 
     fun download(entry: VoicePackEntry) {
@@ -194,7 +194,7 @@ class VoicePacksViewModel(
         }
     }
 
-    /** 下载先走镜像:GitHub 很慢或连不上时用。 */
+    /** Download through mirrors first: for when GitHub is slow or unreachable. */
     val mirrorEnabled: StateFlow<Boolean> get() = ops.mirrorEnabled
 
     fun setMirrorEnabled(on: Boolean) {
@@ -209,7 +209,7 @@ class VoicePacksViewModel(
     }
 
     companion object {
-        /** App 里的一份:清单、存放和安装器都是进程里共用的那一份;推荐按当前界面语言。 */
+        /** The app instance: manifest, store and installer are the process-wide ones; the recommendation follows the current UI language. */
         fun forApp(context: Context, scope: CoroutineScope, copy: (String) -> Unit): VoicePacksViewModel {
             val ops = AppVoicePackOps.from(context)
             val recommended = ops.catalog?.let { OnDeviceLanguage.recommended(it, AppLanguage.current(context)) }
@@ -218,7 +218,7 @@ class VoicePacksViewModel(
     }
 }
 
-/** [VoicePackOps] 的 App 实现。清单读不出来时一个包都没有(整节不显示)。 */
+/** App implementation of [VoicePackOps]. When the manifest cannot be read there are no packs (the section is hidden). */
 internal class AppVoicePackOps(
     val catalog: VoicePackCatalog?,
     private val store: VoicePackStore?,
@@ -248,7 +248,7 @@ internal class AppVoicePackOps(
     }
 }
 
-/** 清单;没有语音包环境(测试)或清单读不了时为 null。 */
+/** The manifest; null when there is no voice-pack environment (tests) or the manifest cannot be read. */
 internal fun VoiceModelEnvironment.voicePackCatalogOrNull(): VoicePackCatalog? = try {
     voicePackCatalog?.invoke()
 } catch (e: CancellationException) {
@@ -257,17 +257,17 @@ internal fun VoiceModelEnvironment.voicePackCatalogOrNull(): VoicePackCatalog? =
     null
 }
 
-/** 这台设备能不能跑 [entry]:有它的引擎、引擎认这个模型族、处理器架构支持。 */
+/** Whether this device can run [entry]: its engine exists, knows the family, and the CPU architecture is supported. */
 internal fun VoiceModelEnvironment.runsVoicePack(entry: VoicePackEntry): Boolean =
     voicePackBackends?.find(entry.backend)?.let { it.supports(entry.family) && it.abiSupported() } == true
 
-/** 这台设备上有能跑的语音包:「离线语音包」一节、选择页的入口和「下载离线语音包」提示都按它显示。 */
+/** Whether any voice pack can run on this device: the "Offline voice packs" section, the selection-page entry and the "Download offline voice pack" prompt all key off it. */
 internal fun VoiceModelEnvironment.hasRunnableVoicePacks(): Boolean =
     voicePackCatalogOrNull()?.packs?.any(::runsVoicePack) == true
 
 /**
- * 选择列表里这一项是本机语音包、文件却不在(从备份恢复、被删):标「需要下载」,选择照留,下好后不用重新选。
- * 只看文件在不在(旧版本也算,照样能用),不算校验和。
+ * This selection is an on-device pack whose files are missing (restored from backup, deleted): mark it "download required", keep the selection, and require no re-selection after downloading.
+ * Only file presence is checked (an older version still counts and remains usable), never checksums.
  */
 internal fun VoiceModelEnvironment.voicePackNeedsDownload(ref: VoiceModelRef): Boolean {
     if (!OnDeviceCatalog.isOnDevice(ref)) return false

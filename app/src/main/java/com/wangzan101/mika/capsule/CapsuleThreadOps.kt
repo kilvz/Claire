@@ -149,11 +149,11 @@ internal fun CapsuleController.fade() {
     val idleFor = if (lastActive == 0L) CapsuleFade.IDLE_MS else (System.currentTimeMillis() - lastActive).coerceAtLeast(0L)
     val wantHidden = CapsuleEdge.hidden(last?.hideAtEdge == true, v.kind, v.pill, v.needCount,
         expanded || capturing, dragging, talk.active, note != null, idleFor)
-    // 收起:先让一颗放一遍收起动效([OverlayMotion] 的 open=false),播完由 [finishTuck] 挪窗口、下一帧换半圆;
-    // 收起过程中又醒了(点它、拖它、来了新事项)就把动效放回去
+    // Collapse: first play the collapse animation on the ball ([OverlayMotion] with open=false); afterwards [finishTuck] moves the window and the next frame switches to the half-circle;
+    // If it wakes during the collapse (tap, drag, new item), put the animation back
     if (tucking && !wantHidden) tucking = false
     if (tuckPending && !wantHidden) {
-        // 刚好在换半圆之前那一帧醒了:窗口挪回停靠位,不换半圆
+        // Woke on the frame just before the half-circle switch: move the window back to the docked position and skip the switch
         tuckJob?.cancel()
         tuckPending = false
         place()
@@ -173,9 +173,9 @@ internal fun CapsuleController.fade() {
 }
 
 /**
- * 收起动效播完:一颗已经淡到看不见了。先把窗口挪到屏幕外(这一帧画面上什么都没有),
- * **下一帧**才换成半圆([commitTuck]):半圆一出来就在实边上,不会先在停靠位闪一下。
- * 窗口尺寸不变(半圆和一颗共用一块窗口,见 [CapsuleEdge.tuckedOffset])。
+ * The collapse animation finished: the ball has faded out of sight. Move the window off-screen first (nothing is drawn on this frame),
+ * and only **the next frame** switches to the half-circle ([commitTuck]): it appears right at the edge instead of flashing at the docked position first.
+ * The window size is unchanged (the half-circle and the ball share one window; see [CapsuleEdge.tuckedOffset]).
  */
 internal fun CapsuleController.finishTuck() {
     if (!tucking) return
@@ -183,7 +183,7 @@ internal fun CapsuleController.finishTuck() {
     tuckPending = true
     place()
     tuckJob?.cancel()
-    // 浮层收不到下一帧时也要换过去:不能一直停在"一颗已经淡没了、半圆还没出来"
+    // Switch anyway when the overlay gets no next frame: never stay in "the ball has faded out but the half-circle has not appeared"
     tuckJob = scope.launch {
         delay(CapsuleController.TUCK_COMMIT_MS)
         commitTuck()
@@ -191,7 +191,7 @@ internal fun CapsuleController.finishTuck() {
     Choreographer.getInstance().postFrameCallback { commitTuck() }
 }
 
-/** [finishTuck] 之后的那一帧:窗口已经在屏幕外了,换成贴边半圆。 */
+/** The frame after [finishTuck]: the window is already off-screen, so switch to the edge half-circle. */
 internal fun CapsuleController.commitTuck() {
     if (!tuckPending) return
     tuckJob?.cancel()
@@ -206,7 +206,7 @@ internal fun CapsuleController.commitTuck() {
     place()
 }
 
-/** 只给展开的那件事收画面;换了一件或收起就停。 */
+/** Capture frames only for the expanded task; stop when it changes or collapses. */
 internal fun CapsuleController.watchPreview(key: String?) {
     if (key == previewKey) return
     previewKey = key

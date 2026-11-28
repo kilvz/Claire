@@ -204,7 +204,7 @@ internal fun VoiceOptionList(
                             VoiceProbeUi.Running -> Text(stringResource(R.string.voice_catalog_testing), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ink3)
                             is VoiceProbeUi.Listening -> Text(probe.transcript.ifBlank { stringResource(R.string.voice_catalog_listening) }, Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ink2)
                             is VoiceProbeUi.Failed -> Text(voiceErrorText(probe.error), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.bad)
-                            VoiceProbeUi.Verified -> Text(stringResource(R.string.voice_catalog_verified), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ok)
+                            is VoiceProbeUi.Verified -> Text(stringResource(R.string.voice_catalog_verified), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ok)
                         }
                     }
                 },

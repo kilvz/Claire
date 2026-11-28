@@ -20,10 +20,10 @@ import java.net.URI
 import javax.net.SocketFactory
 
 /**
- * 应用内更新下载,用于绑定 Wi-Fi 的自动下载以及使用应用代理的手动下载。
- * 是 [VerifiedDownload] 上固定一个任务 key 的薄包装:先写到 `<目标>.part`,下完整了再改名成目标文件,
- * 所以「目标文件在」就是下好了。进程里只有一份(同一时间只下一个,`start` 会取消上一个);
- * 进程被杀后没下完的算失败,用户重试即可。语音包等别的下载用别的 key,和它互不取消。
+ * In-app update downloads, used for automatic downloads bound to Wi-Fi and manual downloads through the app proxy.
+ * A thin wrapper over [VerifiedDownload] with a fixed task key: it writes to `<target>.part`, renames to the target only when complete,
+ * so "the target file exists" means the download finished. There is one instance per process (one download at a time; `start` cancels the previous one);
+ * an unfinished download after the process is killed counts as failed and the user can retry. Voice packs and other downloads use different keys and never cancel each other.
  */
 class ProxiedApkDownload(
     private val http: OkHttpClient,
@@ -47,13 +47,13 @@ class ProxiedApkDownload(
         require(sources.isNotEmpty()) { "no download source" }
         cancel()
         target = file
-        // 使用 Wi-Fi 自己的 DNS 和 socket，断开后连接失败，不会切到移动数据继续下载。
+        // Use Wi-Fi's own DNS and sockets: when it disconnects the connection fails instead of continuing on mobile data.
         val client = wifi?.let { network ->
             wifiBoundClient(http, network.socketFactory, object : Dns {
                 override fun lookup(hostname: String): List<InetAddress> = network.getAllByName(hostname).toList()
             })
         }
-        // 更新包总是重下:原来的做法是覆盖或删掉同名文件,不像语音包那样跳过已校验过的。
+        // Updates always download again: the old approach overwrote or deleted a same-named file instead of skipping already-verified ones as voice packs do.
         file.delete()
         downloads.start(KEY, listOf(DownloadFile(file, sources, verify)), client)
     }
@@ -72,7 +72,7 @@ class ProxiedApkDownload(
 
     @Synchronized
     fun cancel() {
-        // 连带掐断连接,不等读完这一块
+        // Cut the connection too, without waiting for the current block to finish
         downloads.cancel(KEY)
         target?.let { File(it.path + PART).delete() }
     }
@@ -102,7 +102,7 @@ class ProxiedApkDownload(
                 .connectionPool(ConnectionPool()).build()
         }
 
-        /** 把 [url] 下到 [file]:边下边报进度(已下、总共,不知道总共为 -1);不是 2xx、或没下完整就抛错,不留目标文件。 */
+        /** Downloads [url] to [file], reporting progress as it goes (done, total, -1 when total is unknown); throws on a non-2xx response or an incomplete download and leaves no target file. */
         suspend fun fetch(http: OkHttpClient, url: String, file: File, onCall: (Call) -> Unit = {}, progress: (Long, Long) -> Unit) =
             VerifiedDownload.fetch(http, url, file, onCall, progress)
     }

@@ -30,7 +30,7 @@ Claire works on a hidden background screen, so you can keep using your phone whi
 
 - **English by default.** Claire starts in English, and the agent's own instructions are written in English. The app UI comes in English plus 12 translations and follows your system language; switch it in Settings › Language.
 - **OrcaRouter built in.** One API key reaches over 200 models through an OpenAI-compatible endpoint, including a free model (orcarouter/free) and one that picks the model for you (orcarouter/auto). Get a key at [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token) and add it under Settings › Model.
-- **Its own versioning.** Claire 2.8.0 tracks upstream Mika 0.1.52 through commit `d0a515665`. See [VERSION.md](VERSION.md) for how versions are numbered.
+- **Its own versioning.** Claire 2.9.0 tracks upstream Mika through commit `644d3d2f2`. See [VERSION.md](VERSION.md) for how versions are numbered.
 - **Same engine, current features.** Everything upstream Mika does — operating apps on a background screen, browsing the web, the Linux sandbox, schedules, skills and memory — is here, including the latest voice, calling, video and settings work.
 
 ## Get things done with one sentence
@@ -63,11 +63,13 @@ Claire works on a hidden background screen, so you can keep using your phone whi
 
 <sub>Several demos use apps popular in China: WeChat is the main messaging app there, and Xiaohongshu (RED) is a lifestyle and social platform. Claire isn't tied to them; it works with any app or website on your phone.</sub>
 
-## New in 2.8
+## New in 2.9
 
-- **Voice fallbacks and key rotation.** Voice input and read-aloud can try backup models in order, share the chat provider's key pool, rotate keys on rate limits, and fail over when a whole model is overloaded. Speech-to-text can follow the same service as Main or Light.
-- **Smarter model routing.** The step after you interject goes to the main model, and root commands are only written by the main model.
-- **Everything from 2.7 stays.** Pause, AI phone calls, video, on-device voices, the rebuilt schedule editor, settings search, Telegram QR setup, and the Telegram and wireless-debugging fixes.
+- **Offline voice packs.** Voice input can run entirely on the phone with a downloaded voice pack: Whisper Base, covering English and Indonesian. Download it in Settings › Models › Voice input › Offline voice packs, import it from a file when the phone is offline, or fetch it through a mirror; every file is checked against its checksum. "Auto" falls back to an installed pack when the system recognizer cannot be used, and the pack stays selected across downloads, updates and restores.
+- **Settings search reaches inside pages.** Searching settings now finds individual rows and switches, then scrolls to the row and highlights it.
+- **Better conversations and models.** Branching a conversation copies its generated images, audio and video; a conversation's own main model now applies to tasks it starts; model groups retry a rate-limited member once before moving on; exports list missing or oversized attachments.
+- **Capsule and phone fixes.** Dragging the capsule out of its edge half-circle follows the finger from the first frame, and the stock PIN field on the lock screen is recognized correctly again.
+- **Everything from 2.8 stays.** Voice fallbacks and key rotation, per-conversation models, pause, AI phone calls, video, the schedule editor, Telegram setup and the earlier reliability fixes.
 ## What it can do
 
 | | |

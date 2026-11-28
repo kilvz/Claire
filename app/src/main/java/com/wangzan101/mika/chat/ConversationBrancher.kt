@@ -19,7 +19,7 @@ import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.util.UUID
 
-/** 复制分支工作区的结果:[skipped] 是没收下的项(符号链接、越界路径、非常规文件);[truncated] 为 true 时有目录超过上限,那个目录一个文件都没复制。 */
+/** Result of copying a branch workspace: [skipped] lists rejected items (symlinks, out-of-bounds paths, non-regular files); when [truncated] is true some directory exceeded its limit and none of its files were copied. */
 data class BranchCopyResult(
     val copied: Int,
     val skipped: Int = 0,
@@ -32,12 +32,12 @@ enum class RetryAttachmentStatus { COPIED, MISSING, OVER_LIMIT, FAILED }
 
 data class RetryAttachmentResult(val path: String, val status: RetryAttachmentStatus, val sizeBytes: Long? = null)
 
-/** 分支时复制源对话的工作区(用户附件 inbox/ 和生成的音频、图片、视频 out/audio、out/images、out/video);阶段 2 由对话视图注入。 */
+/** Copies the source conversation workspace when branching (user attachments in inbox/ and generated audio, images and video in out/audio, out/images, out/video); injected by the chat view at stage 2. */
 interface BranchWorkspace {
     /**
-     * 复制源对话工作区的 inbox/ 和生成的音频、图片、视频(out/audio、out/images、out/video);目标工作区不存在就建。
-     * 四个目录各自复制,[maxBytes] 各算各的;源没有的目录、复制失败的目录不计入,不影响其余目录;返回值是其余目录结果的合计。
-     * 源和目标是同一个工作区、源工作区/沙箱不可用、四个目录都没有结果时返回 null;目标已有的目录不覆盖,每个记 skipped = 1。
+     * Copies the source conversation workspace's inbox/ and generated audio, images and video (out/audio, out/images, out/video); creates the target workspace if absent.
+     * The four directories are copied independently with their own [maxBytes]; absent source directories and failed copies are left out without affecting the rest, and the result sums the remaining directories.
+     * Returns null when source and target are the same workspace, the source workspace/sandbox is unavailable, or none of the four directories produced a result; existing target directories are not overwritten and each counts as skipped = 1.
      */
     suspend fun copyInbox(
         sourceId: String,
@@ -58,7 +58,7 @@ interface BranchWorkspace {
         paths.map { RetryAttachmentResult(it, RetryAttachmentStatus.FAILED) }
 
     companion object {
-        /** 分支(每个目录各算一份)和重新问(一次复制的总量)默认的字节上限。 */
+        /** Default byte limit for branching (per directory) and for re-asking (total for one copy). */
         const val DEFAULT_MAX_BYTES = 200L * 1024 * 1024
     }
 }
@@ -78,7 +78,7 @@ class AndroidBranchWorkspace(
                 if (src == dst) return@withContext null
                 val srcDir = dirs.workspace(src)
                 val dstDir = dirs.workspace(dst)
-                // 四个目录各自复制:源没有或复制失败的那个返回 null,不影响其余几个
+                // Copy the four directories independently: one that is absent or fails returns null without affecting the others
                 val results = listOfNotNull(
                     copyInboxTree(srcDir, dstDir, maxBytes),
                     copyGeneratedAudioTree(srcDir, dstDir, maxBytes),
@@ -302,7 +302,7 @@ private fun copyGeneratedTree(source: File, target: File, outDir: String, tag: S
     if (!target.isDirectory && !target.mkdirs()) return null
     val dest = File(target, outDir)
     if (dest.exists() || Files.isSymbolicLink(dest.toPath())) return BranchCopyResult(copied = 0, skipped = 1)
-    // 新分支的工作区还没有 out/,不先建的话最后改名会失败
+    // A new branch workspace has no out/ yet; without creating it first the final rename fails
     dest.parentFile?.let { mkdirs(it.toPath()) }
     val tmp = File(target, ".$tag-tmp-${UUID.randomUUID()}")
     if (!tmp.mkdirs()) return null

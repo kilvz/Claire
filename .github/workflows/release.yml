@@ -70,7 +70,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.8.0: voice input and read-aloud can use backup models in order, share the chat provider's key pool, rotate keys on rate limits, and fail over when a whole model is overloaded; speech-to-text can follow the same service as Main or Light. The step after you interject goes to the main model, and root commands are only written by the main model.
+            New in 2.9.0: offline voice packs let voice input run entirely on the phone with a downloaded Whisper Base pack for English and Indonesian, including file import, download mirrors and checksum verification, with Auto falling back to an installed pack when the system recognizer is unusable. Settings search now finds individual rows and scrolls to them. Branching a conversation copies its generated images, audio and video, a conversation's own main model now applies to tasks it starts, model groups retry a rate-limited member once, and the capsule drag and stock lock-screen PIN fixes are included.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt

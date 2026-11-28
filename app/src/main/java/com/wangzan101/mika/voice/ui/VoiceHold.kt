@@ -199,8 +199,8 @@ internal fun HeardText(stable: String, tail: String, style: androidx.compose.ui.
 }
 
 /**
- * 本机识别失败给用户的那一句:原因链里是「文件损坏」([OnDeviceSttException.Kind.Corrupt])才说「语音包已损坏,请重新下载」;
- * 超时、内存不足、解码出错([OnDeviceSttException.Kind.Failed])、取消、模型被释放、清单读不了等重新下载没用,只说「离线识别失败,请重试」。
+ * The line shown to the user when on-device recognition fails: only a "corrupt files" cause ([OnDeviceSttException.Kind.Corrupt]) says "voice pack damaged, download it again";
+ * timeouts, out-of-memory, decode errors ([OnDeviceSttException.Kind.Failed]), cancellation, a released model and an unreadable manifest are not fixed by downloading again, so they only say "offline recognition failed, try again".
  */
 internal fun onDeviceFailureText(error: VoiceModelError.OnDeviceFailed): Int {
     val corrupt = generateSequence<Throwable>(error) { it.cause }.take(8)
@@ -208,7 +208,7 @@ internal fun onDeviceFailureText(error: VoiceModelError.OnDeviceFailed): Int {
     return if (corrupt) R.string.voice_pack_corrupt_error else R.string.voice_on_device_failed
 }
 
-/** 按住说话时界面上要的文字;不碰界面,单测直接测。 */
+/** Text the hold-to-talk UI needs; it never touches the UI, so unit tests exercise it directly. */
 internal object VoiceCopy {
     /** Where a sentence ends: break after these punctuation marks. */
     private val sentenceEnd = setOf('。', '！', '？', '；', '!', '?', ';', '.', '…', '\n')
@@ -256,11 +256,11 @@ internal object VoiceCopy {
         SpeechFailure.Network -> tr(R.string.voice_network)
         SpeechFailure.MicUnavailable, SpeechFailure.AudioError -> tr(R.string.voice_mic_unavailable)
         is SpeechFailure.Provider -> when (why.error) {
-            // 本机语音包没装:和开不了会话时同一句「需要下载」
+            // The on-device pack is not installed: the same "download required" line as an unavailable session
             is VoiceModelError.PackMissing -> unavailable(SpeechEngineSpec.Why.VoicePackMissing)
-            // 本机识别失败:说该怎么办,不露英文的原因(只有文件坏了才叫人重新下载)
+            // On-device recognition failed: say what to do without exposing the raw English reason (only corrupt files ask for another download)
             is VoiceModelError.OnDeviceFailed -> tr(onDeviceFailureText(why.error))
-            // 服务商的错沿用模型出错时的说法(额度、Key、找不到模型……)
+            // Provider errors reuse the model-error wording (quota, key, model not found, …)
             else -> tr(R.string.voice_provider_failed, why.error.message.orEmpty())
         }
         SpeechFailure.NoPermission -> tr(R.string.voice_permission_title)
@@ -283,7 +283,7 @@ internal object VoiceCopy {
         SpeechEngineSpec.Why.OnDeviceUnsupported -> tr(R.string.voice_unavailable_on_device_unsupported)
     }
 
-    /** 「还不能语音输入」里要不要给「下载离线语音包」:没有能用的识别、自带识别不响应、选的语音包没装。 */
+    /** Whether "voice input unavailable" should offer "Download offline voice pack": no usable recognizer, the built-in one is unresponsive, or the selected pack is not installed. */
     fun offersVoicePacks(why: SpeechEngineSpec.Why): Boolean = when (why) {
         SpeechEngineSpec.Why.NoSystemNoModel, SpeechEngineSpec.Why.SystemNoResponse, SpeechEngineSpec.Why.VoicePackMissing -> true
         else -> false
@@ -768,7 +768,7 @@ internal fun VoiceSheetHost(
     vh: VoiceHold,
     onPickSpeech: () -> Unit,
     onOpenVoicePacks: () -> Unit = {},
-    /** 这台设备有没有能跑的离线语音包(没有就不给「下载离线语音包」);null 是看 App 里的语音包环境。测试里换掉。 */
+    /** Whether this device has any runnable offline voice pack (otherwise "Download offline voice pack" is hidden); null reads the app's voice-pack environment. Replaced in tests. */
     voicePacksAvailable: (() -> Boolean)? = null,
 ) {
     val sheet = vh.sheet ?: return
@@ -778,7 +778,7 @@ internal fun VoiceSheetHost(
         (sheet as? VoiceSheet.Unavailable)?.let { VoiceCopy.offersVoicePacks(it.why) } == true &&
             (voicePacksAvailable?.invoke() ?: VoiceModelEnvironment.get(context).hasRunnableVoicePacks())
     }
-    // 语音包缺了:主按钮就是去下载;别的没引擎的情况在下面再加一个
+    // Pack missing: the primary button goes to download; other no-engine cases add one below
     val packFirst = packsHere && (sheet as VoiceSheet.Unavailable).why == SpeechEngineSpec.Why.VoicePackMissing
     val title: String
     val body: String

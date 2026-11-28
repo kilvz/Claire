@@ -10,9 +10,9 @@ import com.wangzan101.mika.voice.model.VoiceModelRef
 import com.wangzan101.mika.voice.model.VoiceService
 
 /**
- * 已安装的语音包在语音目录里的样子:固定服务 [SERVICE] 下,每个包一个模型(模型 id 就是包 id)。
- * 和其他模型一样存进目录快照(不像 android-system 那样每次临时生成),备援链、整理规则都不用特殊处理;
- * 文件不在时模型和选择照留,用到时报 [com.wangzan101.mika.voice.model.VoiceModelError.PackMissing]。
+ * How an installed voice pack appears in the voice catalog: one model per pack under the fixed [SERVICE] (the model id is the pack id).
+ * Like other models it is stored in the catalog snapshot (unlike android-system, which is generated on the fly), so fallback chains and cleanup rules need no special cases.
+ * When files are gone the model and the selection stay; using it reports [com.wangzan101.mika.voice.model.VoiceModelError.PackMissing].
  */
 object OnDeviceCatalog {
     const val SERVICE_ID = "on-device"

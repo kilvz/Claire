@@ -128,7 +128,7 @@ internal object ScreenReader {
                 hintText = n.hintText?.toString()?.takeUnless { it.isBlank() },
                 resourceId = n.viewIdResourceName,
                 clickable = n.isClickable, editable = editable, scrollable = n.isScrollable,
-                checkable = n.isCheckable, checked = n.isCheckedCompat(), selected = n.isSelected,
+                checkable = n.isCheckable, checked = n.isChecked, selected = n.isSelected,
                 enabled = n.isEnabled, focused = n.isFocused, secret = n.isPassword,
                 wheel = isWheel(n),
                 children = children,
@@ -239,7 +239,7 @@ internal object ScreenReader {
 
     /** Widget states used to judge the effect of an action (the same set that [hash] looks at). */
     private fun uiStates(n: AccessibilityNodeInfo): Set<String> = buildSet {
-        if (n.isCheckedCompat()) add(UiStates.CHECKED)
+        if (n.isChecked) add(UiStates.CHECKED)
         if (n.isSelected) add(UiStates.SELECTED)
         if (!n.isEnabled) add(UiStates.DISABLED)
     }
@@ -248,9 +248,6 @@ internal object ScreenReader {
     @Suppress("DEPRECATION")
     private fun states(n: AccessibilityNodeInfo) =
         "${n.isChecked}${n.isSelected}${n.isEnabled}${n.isFocused}${n.textSelectionStart}:${n.textSelectionEnd}"
-
-    private fun states(n: AccessibilityNodeInfo) =
-        "${n.isCheckedCompat()}${n.isSelected}${n.isEnabled}${n.isFocused}${n.textSelectionStart}:${n.textSelectionEnd}"
 
     /** The node's own name: its text (hint text counts too; input fields use it to state their purpose), falling back to the content description. */
     fun ownLabel(n: AccessibilityNodeInfo): String? {

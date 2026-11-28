@@ -18,7 +18,7 @@ spec.loader.exec_module(publish)
 REPO = HERE.parent.parent
 PACKS = HERE / "packs.json"
 CATALOG = REPO / "app" / "src" / "main" / "assets" / "voice-models" / "catalog.json"
-APP_LANGUAGES = {"zh-Hans", "zh-Hant", "ar", "fa", "en", "ja", "ko", "es", "pt", "ru", "id", "tr", "vi"}
+APP_LANGUAGES = {"en", "id"}
 
 
 def sha(data):
@@ -219,11 +219,12 @@ class CommittedCatalogTest(unittest.TestCase):
         tags = [tag for pack in self.catalog["packs"] for tag in pack["recommendedFor"]]
         self.assertEqual(len(tags), len(set(tags)))
 
-    def test_four_packs_with_optional_whisper_small(self):
+    def test_curated_catalog_has_only_whisper_base(self):
         ids = [pack["id"] for pack in self.catalog["packs"]]
-        self.assertEqual(ids, ["sensevoice-small-int8", "dolphin-base-ctc-int8", "whisper-base-int8", "whisper-small-int8"])
-        small = self.catalog["packs"][3]
-        self.assertEqual(small["recommendedFor"], [])
+        self.assertEqual(ids, ["whisper-base-int8"])
+        pack = self.catalog["packs"][0]
+        self.assertEqual(pack["languages"], ["en", "id"])
+        self.assertEqual(pack["recommendedFor"], ["en", "id"])
 
     def test_asset_names_are_unique(self):
         names = [publish.asset_name(p["id"], f["name"]) for p in self.catalog["packs"] for f in p["files"]]
@@ -246,29 +247,29 @@ class FakeGh:
 
 class UploadTest(unittest.TestCase):
     def test_upload_refuses_latest(self):
-        argv = publish.upload_args("voice-models-v1")
-        self.assertEqual(argv[:4], ["gh", "release", "create", "voice-models-v1"])
+        argv = publish.upload_args("voice-models-1")
+        self.assertEqual(argv[:4], ["gh", "release", "create", "voice-models-1"])
         self.assertIn("--prerelease", argv)
         self.assertIn("--latest=false", argv)
         self.assertIn("--repo", argv)
 
     def test_upload_args_only_for_voice_model_tags(self):
-        for tag in ["v1.2.0", "latest", "voice-models-v1; rm", ""]:
+        for tag in ["v1.2.0", "latest", "voice-models-1; rm", ""]:
             with self.assertRaises(ValueError, msg=tag):
                 publish.upload_args(tag)
 
     def test_asset_upload_args_name_files_by_asset(self):
-        argv = publish.asset_upload_args("voice-models-v1", [Path("/s/demo-int8--model.onnx")])
-        self.assertEqual(argv[:4], ["gh", "release", "upload", "voice-models-v1"])
+        argv = publish.asset_upload_args("voice-models-1", [Path("/s/demo-int8--model.onnx")])
+        self.assertEqual(argv[:4], ["gh", "release", "upload", "voice-models-1"])
         self.assertIn("/s/demo-int8--model.onnx", argv)
 
     def test_upload_refuses_existing_release_that_is_not_prerelease(self):
-        gh = FakeGh(view={"isPrerelease": False, "tagName": "voice-models-v1"})
+        gh = FakeGh(view={"isPrerelease": False, "tagName": "voice-models-1"})
         with tempfile.TemporaryDirectory() as tmp:
             cache = Path(tmp)
             publish.fetch([sample_pack()], cache, opener=good_web())
             with self.assertRaises(publish.RefuseUpload):
-                publish.upload([sample_pack()], cache, "voice-models-v1", run=gh)
+                publish.upload([sample_pack()], cache, "voice-models-1", run=gh)
         self.assertFalse(any(call[:3] == ["gh", "release", "upload"] for call in gh.calls))
 
     def test_upload_creates_prerelease_then_uploads_verified_assets(self):
@@ -276,7 +277,7 @@ class UploadTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             cache = Path(tmp)
             publish.fetch([sample_pack()], cache, opener=good_web())
-            publish.upload([sample_pack()], cache, "voice-models-v1", run=gh)
+            publish.upload([sample_pack()], cache, "voice-models-1", run=gh)
         create = [c for c in gh.calls if c[:3] == ["gh", "release", "create"]]
         uploads = [c for c in gh.calls if c[:3] == ["gh", "release", "upload"]]
         self.assertEqual(len(create), 1)
@@ -287,7 +288,7 @@ class UploadTest(unittest.TestCase):
 
     def test_upload_refuses_tag_that_differs_from_catalog_release(self):
         with self.assertRaises(publish.RefuseUpload):
-            publish.upload([sample_pack()], Path("/nonexistent"), "voice-models-v2", run=FakeGh())
+            publish.upload([sample_pack()], Path("/nonexistent"), "voice-models-2", run=FakeGh())
 
 
 if __name__ == "__main__":

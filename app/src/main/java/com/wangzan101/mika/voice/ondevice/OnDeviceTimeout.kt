@@ -2,7 +2,7 @@ package com.wangzan101.mika.voice.ondevice
 
 import com.wangzan101.mika.voice.Wav
 
-/** 本机识别的时间预算:一段录音给它音频时长的 [FACTOR] 倍,至少 [MIN_MS];加载模型另算 [LOAD_TIMEOUT_MS]。 */
+/** Time budget for on-device recognition: [FACTOR] times the audio duration, at least [MIN_MS]; loading a model is budgeted separately by [LOAD_TIMEOUT_MS]. */
 object OnDeviceTimeout {
     const val MIN_MS = 30_000L
     const val FACTOR = 3

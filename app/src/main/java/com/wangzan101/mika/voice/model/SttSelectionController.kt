@@ -73,11 +73,11 @@ class SttSelectionController(private val environment: VoiceModelEnvironment) {
             (backups.isNotEmpty() || environment.accountResolver.pooled(model))
         if (!chained) return adapter.start(context, model, spokenLanguage(model, language), hooks)
         adapter.spec(model)
-        // 链头是本机语音包时,按下就开始加载模型(备援链不经它自己的 start)
+        // When the chain starts with an on-device pack, start loading the model on press (the fallback chain does not go through its own start)
         adapter.prewarm(model)
         val candidates = listOf(ref) + backups.filter { it != ref }.take(VoiceFallbacks.MAX)
         val transcribe = transcribeChain(context, candidates, language, first = model)
-        // 链上有本机语音包时不设总上限:它按录音长短自己限时,慢机器上可能超过 30 秒;云端的每个仍各自限时
+        // With an on-device pack in the chain there is no overall limit: it times itself by clip length and may exceed 30 s on a slow device; each cloud model still has its own limit
         val timeoutMs = if (candidates.any { isOnDevice(it) }) Long.MAX_VALUE
         else ProviderSpeech.TRANSCRIBE_TIMEOUT_MS * candidates.size
         return categorizedSession {
@@ -86,10 +86,10 @@ class SttSelectionController(private val environment: VoiceModelEnvironment) {
     }
 
     /**
-     * 同一段录音按 [candidates] 依次转写:每个模型走自己账号的密钥池([VoiceAccountResolver.withPooledKey]),
-     * 失败了由 [VoiceFailover] 决定换不换下一个。每个模型最多等 [ProviderSpeech.TRANSCRIBE_TIMEOUT_MS],
-     * 超时当这个模型连不上,换下一个。本机语音包不套这个上限:它自己按录音长短限时,超时记成本机失败,
-     * 不是网络错误。只收整段上传识别的模型,别的跳过。
+     * Transcribes the same clip through [candidates] in order: each model uses its own account key pool ([VoiceAccountResolver.withPooledKey]),
+     * and [VoiceFailover] decides whether to move to the next on failure. Each model waits at most [ProviderSpeech.TRANSCRIBE_TIMEOUT_MS];
+     * a timeout counts as this model being unreachable and moves on. On-device packs are exempt: they time themselves by clip length and a timeout counts as an on-device failure,
+     * not a network error. Only whole-clip upload models are accepted; others are skipped.
      */
     internal fun transcribeChain(
         context: Context,
@@ -115,7 +115,7 @@ class SttSelectionController(private val environment: VoiceModelEnvironment) {
                     transcribe(wav)
                 } else {
                     withTimeoutOrNull(attemptTimeoutMs) { transcribe(wav) }
-                        // 和网络超时同一种错误:界面照「连不上」处理,换不换下一个也按网络错误判断
+                        // The same kind of error as a network timeout: the UI treats it as "cannot connect", and moving on is decided as for network errors
                         ?: throw ModelError.Network(SocketTimeoutException("transcription timed out"))
                 }
             }
@@ -126,7 +126,7 @@ class SttSelectionController(private val environment: VoiceModelEnvironment) {
         environment.catalog.state.value.models.firstOrNull { it.serviceId == ref.serviceId && it.id == ref.modelId }
             ?.stt?.protocol == SttProtocol.OnDevice
 
-    /** 这次识别交给服务的语言。 */
+    /** The language given to the service for this recognition. */
     private fun spokenLanguage(model: ResolvedVoiceModel, language: String?): String? {
         val binding = model.model.stt ?: throw VoiceModelError.Unsupported(VoiceCapability.STT)
         return when (binding.protocol) {

@@ -21,8 +21,8 @@ import java.io.IOException
 import kotlin.coroutines.coroutineContext
 
 /**
- * 任务里的一个文件:按 [sources] 的顺序下到 [target],每个来源下完都先过 [verify](大小、摘要等),
- * 不通过就当这个来源失败。[size] 是事先知道的字节数(清单里写着),用来算整个任务的进度;不知道为 -1。
+ * One file in a task: downloaded to [target] in [sources] order, and every finished source must first pass [verify] (size, digest and so on);
+ * otherwise the source counts as failed. [size] is the byte count known in advance (from the manifest) for overall task progress; -1 when unknown.
  */
 data class DownloadFile(
     val target: File,
@@ -31,7 +31,7 @@ data class DownloadFile(
     val size: Long = -1,
 )
 
-/** 一个任务的进度。[totalBytes] 不知道时为 -1;[error] 是 [DownloadPhase.Failed] 时最后一次的失败原因。 */
+/** Progress of one task. [totalBytes] is -1 when unknown; [error] is the last failure reason when [DownloadPhase.Failed]. */
 data class DownloadProgress(
     val phase: DownloadPhase,
     val doneBytes: Long,
@@ -40,16 +40,16 @@ data class DownloadProgress(
 )
 
 /**
- * 通用的带校验下载器,App 更新(`about/`)和离线语音包(`voice/`)共用,所以单独成一个顶层包。
+ * A generic verified downloader shared by app updates (`about/`) and offline voice packs (`voice/`), so it lives in its own top-level package.
  *
- * - 一个任务按顺序下一组文件;每个文件各自按来源顺序尝试,不要求整组从同一个来源下完。
- * - 每个文件先写到 `<目标>.part`,下完整才改名成目标,**然后**才过校验;开始时目标已在且校验通过的文件直接跳过。
- * - 目标文件以最终名字存在**不等于**校验过:校验进行中、校验没过还没来得及删、上次被打断时都可能是这样。
- *   调用方(比如语音包安装)只能在 [start] 的 `onComplete` 里、或自己重新校验之后使用这些文件。
- * - 某个文件所有来源都失败(或 `onComplete` 失败),整个任务失败,这个任务的目标文件一个都不留,
- *   包括开始时因为已经校验通过而跳过的那些。取消只清掉正在下的那个文件,已校验的留着,重试时跳过。
- * - 任务按 key 区分:同一个 key 同时只有一个任务,不同 key 互不取消。
- * - 进程被杀后没下完的算失败,用户重试即可。下载只在调用方(用户点按)要求时开始。
+ * - A task downloads a set of files in order; each file tries its sources in order, and the set need not come from one source.
+ * - Each file is written to `<target>.part`, renamed to the target only when complete, and **then** verified; files already present and verified at the start are skipped.
+ * - A target file existing under its final name does **not** mean it was verified: that can happen mid-verification, after a failed verification before deletion, or after an interrupted run.
+ *   Callers (such as the voice-pack installer) may use these files only inside [start]'s `onComplete`, or after verifying them again themselves.
+ * - When every source fails for one file (or `onComplete` fails), the whole task fails and none of its target files are kept,
+ *   including those skipped at the start because they had already verified. Cancellation clears only the file being downloaded; verified files stay and are skipped on retry.
+ * - Tasks are identified by key: one task per key at a time, and different keys never cancel each other.
+ * - An unfinished download after the process is killed counts as failed and the user can retry. Downloads start only when the caller (a user tap) asks.
  */
 class VerifiedDownload(
     private val http: OkHttpClient,
@@ -59,26 +59,26 @@ class VerifiedDownload(
         lateinit var job: Job
         @Volatile var call: Call? = null
         @Volatile var current: File? = null
-        /** 任务失败的原因;为空且任务没正常结束就是被取消。 */
+        /** Why the task failed; null with an abnormal end means it was cancelled. */
         @Volatile var failure: Throwable? = null
-        /** 每个文件的已下字节和总字节;总字节先取 [DownloadFile.size],下载中拿到响应长度、下完拿到实际长度时更新。 */
+        /** Downloaded and total bytes per file; totals start from [DownloadFile.size] and update from the response length during the download and the real length when it finishes. */
         val done = LongArray(files.size)
         val sizes = LongArray(files.size) { files[it].size }
     }
 
     private val runs = mutableMapOf<String, Run>()
-    /** 每个 key 最近的一个任务;同 key 的新任务等它彻底结束(连接断开、半截文件清掉)才开始。 */
+    /** The latest task per key; a new task with the same key waits until it ends completely (connection closed, partial file removed). */
     private val last = mutableMapOf<String, Job>()
     private val flows = mutableMapOf<String, MutableStateFlow<DownloadProgress>>()
 
     /**
-     * 开始下载 [files];[key] 已经有任务在跑时什么都不做,返回 false。
-     * [client] 为空时用构造时给的 [http](走应用代理);全部通过后先跑 [onComplete](比如把文件挪到安装位置),
-     * 它也成功才算 [DownloadPhase.Ready],它抛错算失败。
+     * Starts downloading [files]; if a task is already running for [key] it does nothing and returns false.
+     * When [client] is null the constructor's [http] is used (through the app proxy); after everything passes, [onComplete] runs first (for example moving files into place),
+     * and the task reaches [DownloadPhase.Ready] only if that succeeds; if it throws, the task fails.
      *
-     * [prepare] 在任务里、下第一个文件之前跑(比如在后台线程上建空的目标目录),抛错算失败。
-     * [onEnd] 在任务彻底结束后调一次,不论成功、失败、取消,也不论 scope 在任务开跑前就已取消;
-     * 它先于进度变成最终状态,调用方在里面清理自己的东西(放弃 staging、放开锁)。它不该抛错,抛了也只吞掉。
+     * [prepare] runs inside the task before the first file (for example creating an empty target directory on a background thread); throwing fails the task.
+     * [onEnd] is called once after the task ends completely, whether it succeeded, failed or was cancelled, and even when the scope was cancelled before the task started;
+     * it runs before progress reaches its final state, and callers clean up there (abandon staging, release locks). It should not throw; any error is swallowed.
      */
     @Synchronized
     fun start(
@@ -103,18 +103,18 @@ class VerifiedDownload(
                 download(key, run, client ?: http)
                 onComplete()
             } catch (e: Throwable) {
-                // 真正的取消(任务本身已不在跑)按取消处理;别的一律算失败,包括 Error,
-                // 以及任务还在跑时 verify/onComplete 里冒出来的 CancellationException(比如超时)。
+                // A real cancellation (the task itself is no longer running) counts as cancelled; everything else counts as failure, including Error
+                // and a CancellationException surfacing from verify/onComplete while the task still runs (for example a timeout).
                 if (e is CancellationException && !isActive) throw e
                 run.failure = e
                 files.forEach { it.target.delete() }
-                // 内存耗尽这类虚拟机错误清理后照样抛出,不当成普通失败吞掉;其余失败只记在进度里。
+                // VM errors such as out-of-memory are rethrown after cleanup instead of being swallowed as ordinary failures; other failures are only recorded in progress.
                 if (e is VirtualMachineError) throw e
             }
         }
         run.job = job
         last[key] = job
-        // 收尾放在完成回调里:scope 在任务开跑前就被取消时任务体一行都不会执行,也要把 key 放出来。
+        // Cleanup lives in the completion callback: when the scope is cancelled before the task starts, no line of the task body runs, so the key must still be released.
         job.invokeOnCompletion { cause ->
             try {
                 runCatching(onEnd)
@@ -129,7 +129,7 @@ class VerifiedDownload(
     @Synchronized
     private fun finish(key: String, run: Run, cause: Throwable?) {
         if (last[key] === run.job) last.remove(key)
-        // 被 [cancel] 停掉时已经摘掉、发过 Idle 了。
+        // When [cancel] stopped it, it was already removed and reported Idle.
         if (runs[key] !== run) return
         runs.remove(key)
         val failure = run.failure
@@ -144,15 +144,15 @@ class VerifiedDownload(
     fun progress(key: String): StateFlow<DownloadProgress> = flow(key).asStateFlow()
 
     /**
-     * 等 [key] 最近的任务彻底结束(包括 [cancel] 之后连接断开、半截文件清掉、`onComplete` 跑完);没有就立刻返回。
-     * 调用方要在任务结束后清理自己的东西(比如语音包的 staging)时用它,不能只看进度:取消时进度立刻回到 Idle,任务可能还没停。
+     * Waits until the latest task for [key] ends completely (including the connection closing after [cancel], the partial file being removed and `onComplete` finishing); returns at once when there is none.
+     * Use this when the caller must clean up after the task ends (such as voice-pack staging); progress alone is not enough because cancellation returns it to Idle immediately while the task may still be stopping.
      */
     suspend fun join(key: String) {
         val job = synchronized(this) { last[key] }
         job?.join()
     }
 
-    /** 停掉 [key] 的任务:连带掐断连接,不等读完这一块;正在下的半截文件删掉,进度回到 [DownloadPhase.Idle]。 */
+    /** Stops the task for [key]: cuts the connection without waiting for the current block to finish, deletes the partial file being downloaded, and returns progress to [DownloadPhase.Idle]. */
     @Synchronized
     fun cancel(key: String) {
         val run = runs.remove(key) ?: return
@@ -174,7 +174,7 @@ class VerifiedDownload(
             var failure: Exception? = null
             for (url in file.sources) {
                 coroutineContext.ensureActive()
-                // 换来源时这个文件从头算。
+                // When switching sources this file starts over.
                 update(key, run) { run.done[index] = 0; run.sizes[index] = file.size }
                 try {
                     fetch(client, url, file.target, onCall = { next ->
@@ -196,7 +196,7 @@ class VerifiedDownload(
                     file.target.delete()
                     throw e
                 } catch (e: Exception) {
-                    // 取消导致的连接异常不能触发下一个来源。
+                    // A connection error caused by cancellation must not trigger the next source.
                     file.target.delete()
                     coroutineContext.ensureActive()
                     failure = e
@@ -221,7 +221,7 @@ class VerifiedDownload(
         }
     }
 
-    /** 只改还在跑的这个任务的进度;被取消或换掉后迟到的回调不覆盖新状态。 */
+    /** Updates progress only for this still-running task; a late callback after cancellation or replacement never overwrites the new state. */
     private inline fun update(key: String, run: Run, change: () -> Unit) {
         synchronized(this) {
             if (runs[key] !== run) return
@@ -242,7 +242,7 @@ class VerifiedDownload(
     companion object {
         private const val PART = ".part"
 
-        /** 把 [url] 下到 [file]:边下边报进度(已下、总共,不知道总共为 -1);不是 2xx、或没下完整就抛错,不留目标文件。 */
+        /** Downloads [url] to [file], reporting progress as it goes (done, total, -1 when total is unknown); throws on a non-2xx response or an incomplete download and leaves no target file. */
         suspend fun fetch(http: OkHttpClient, url: String, file: File, onCall: (Call) -> Unit = {}, progress: (Long, Long) -> Unit) {
             val part = File(file.path + PART)
             try {

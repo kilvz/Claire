@@ -57,28 +57,28 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 /**
- * 悬浮胶囊的接线:把各任务的状态([TaskCenterState.runs] 和每个 [TaskRun] 的状态、接管阶段、活动)、开关、
- * Mika 界面在不在前台([AppForeground])、屏幕亮没亮([DeviceStateWatcher])、无障碍服务在不在交给 [CapsuleModel],
- * 按它的结果经 [com.wangzan101.mika.cap.phone.a11y.OverlayHost] 加上、挪动或拆掉浮层窗口。
- * 点一颗或胶囊展开卡片([CapsuleCards] 定内容,只说一件事),点卡片外面、收起按钮或返回收回成一颗(看过的不再展开,模型记着);卡片和胶囊上的按钮都转成任务服务现有的动作。
- * 一颗和卡片各在一个窗口里、各待各的位置(见 [window]):展开时一颗那个窗口显式隐藏,卡片在自己的窗口里从那一颗的方位缩放、淡入,
- * 收起时缩回去,一颗再在边上冒出来([OverlayMotion]:只动图层,不挪窗口,也不逐帧改窗口大小)。
- * 双击一颗或胶囊(见 [DoubleTap]:单击要等双击的时限过去才展开,两下还要同来源、落点相近)把用户此刻的屏幕截进那张卡片的输入框预览,
- * 不直接发出;用户看过预览、按发送后才和在卡片里发一句话走同一条路。卡片输入框左边的截屏按钮也挂在输入框上面,可以补一句再发。
- * 截的时候浮层先藏起来,截完再出来,一颗上闪一下。
- * 卡片底部的输入框点开时浮层才能接收键盘,发出、收起、点外面、按返回时马上还回去;输入法弹出时胶囊和卡片挪到它上面。
- * 长按一颗或胶囊说话(见 [CapsuleTalk]、[CapsuleVoicePanel]):按着时整屏压暗、胶囊旁边浮出面板和「取消」「改一改」两个落点,
- * 松开直接发给单击会展开的那张卡片(和双击发屏幕同一套找目标),拖到「改一改」打开卡片、字在输入框里,拖到「取消」丢掉;
- * 发出、没听清、用不了时胶囊上闪一句([note])。面板在一颗那个窗口下面的另一个窗口里,不接触摸。
- * 卡片展开时才收那件事的画面(每秒至多 [PREVIEW_FPS] 张,没变不推)。平时是一颗图标,有事要说时展开成胶囊(模型定);
- * 可以拖,松手贴到最近的左边或右边;停的位置按边和高度比例记在 [FeatureFlags],转屏后按比例重新摆。
- * 开了贴边自动隐藏([CapsuleEdge])时缩成贴边半圆:窗口**一直是一颗那么大**,只是整块挪到屏幕外只留 [SLIVER_DP],
- * 换状态时只挪窗口、不改窗口尺寸(系统不会跑窗口缩放过渡)。收起先放收起动效([CapsuleOverlays]),点一下半圆照常
- * 展开,只有**从半圆拖出来**这一下直接到位、从第一帧就跟手。
- * 卡片左右居中(对话卡片固定高,任务卡片按内容高、最多一样高),按着标题栏上下拖,上边的比例另记一份,换卡片时上边不动;
- * 对话卡片的来回从 [ConversationStore] 读(和对话页同一份),
- * 操作过的 App 从那一轮的运行记录([RunStore])里读。
- * 浮层画不出来(服务刚断开、系统不让)时这个服务实例上不再重试,胶囊不出现,通知照旧。全部在主线程。
+ * Wiring for the floating capsule: hands each task state ([TaskCenterState.runs] plus each [TaskRun]'s state, takeover stage and activity), the switches,
+ * whether the Claire UI is in the foreground ([AppForeground]), whether the screen is on ([DeviceStateWatcher]) and whether the accessibility service is present to [CapsuleModel],
+ * and follows its result to add, move or tear down overlay windows through [com.wangzan101.mika.cap.phone.a11y.OverlayHost].
+ * Tapping the ball or capsule expands the card ([CapsuleCards] decides the content, one thing at a time); tapping outside the card, the collapse button or Back tucks it back into the ball (things already seen are not expanded again, and the model remembers); buttons on the card and capsule map to existing task-service actions.
+ * The ball and the card each live in their own window and keep their own position (see [window]): when expanding, the ball window is explicitly hidden and the card scales and fades in from the ball's side in its own window,
+ * and when collapsing it shrinks back while the ball reappears at the edge ([OverlayMotion]: animates layers only, never moves windows or resizes them frame by frame).
+ * Double-tapping the ball or capsule (see [DoubleTap]: a single tap waits for the double-tap timeout before expanding, and both taps must share a source and land close together) captures the user's current screen into the card's input preview
+ * without sending it; after the user reviews the preview and presses send, it takes the same path as typing a message in the card. The screenshot button to the left of the card input sits above the input too, so an extra line can be added before sending.
+ * While capturing, overlays hide first and reappear afterwards, with a flash on the ball.
+ * The overlay accepts the keyboard only while the input at the bottom of the card is open; it is handed straight back on send, collapse, outside tap or Back; when the IME appears, the capsule and card move above it.
+ * Long-pressing the ball or capsule to talk (see [CapsuleTalk], [CapsuleVoicePanel]): while held, the screen dims and a panel with "Cancel" and "Revise" targets floats beside the capsule;
+ * releasing sends straight to the card that a single tap would expand (the same target lookup as double-tap screen sending), dragging to "Revise" opens the card with the text in the input, and dragging to "Cancel" discards it;
+ * sending, not hearing clearly or being unable to use it flashes a line on the capsule ([note]). The panel lives in another window below the ball window and does not consume touches.
+ * The card captures that task's screen only while expanded (at most [PREVIEW_FPS] per second, and unchanged frames are not pushed). Normally it is just an icon; when there is something to say it expands into a capsule (the model decides);
+ * it can be dragged and snaps to the nearest left or right edge on release; the resting position is stored in [FeatureFlags] as an edge and height ratio, and is restored proportionally after rotation.
+ * With edge auto-hide enabled ([CapsuleEdge]) it shrinks to a half-circle at the edge: the window **stays the size of the ball** and is merely moved off-screen leaving only [SLIVER_DP],
+ * and state changes move the window without resizing it (the system would not animate a resize). Collapsing plays the collapse animation first ([CapsuleOverlays]); tapping the half-circle still
+ * expands normally, and only **dragging out of the half-circle** goes straight to the final position and follows the finger from the first frame.
+ * The card is horizontally centred (conversation cards have a fixed height, task cards size to content up to the same height); dragging the title bar moves it vertically, the top ratio is stored separately, and the top stays put when switching cards;
+ * conversation history comes from [ConversationStore] (the same copy as the chat page),
+ * and apps that were operated come from that run's record ([RunStore]).
+ * When overlays cannot be drawn (the service just disconnected, the system refuses), this service instance does not retry, the capsule does not appear, and notifications work as before. Everything runs on the main thread.
  */
 class CapsuleController(
     internal val context: Context,
@@ -193,11 +193,11 @@ class CapsuleController(
     /** The height ratio of the "You handle it" bar (remembered only for this run). */
     internal var barFraction = 0f
     internal var dragging = false
-    /** 这一次是从贴边半圆拖出来的:一颗直接到位(见 [CapsuleOverlay]),不走展开动效,从第一帧就跟手。 */
+    /** This one was dragged out of the edge half-circle: the ball goes straight into place (see [CapsuleOverlay]) with no expand animation and follows the finger from the first frame. */
     internal var revealInstant by mutableStateOf(false)
-    /** 正在放收起动效:这一颗正朝边上缩小淡出,播完([finishTuck])才换成贴边半圆。 */
+    /** The collapse animation is playing: the ball is shrinking and fading toward the edge, and only after it finishes ([finishTuck]) does it become the edge half-circle. */
     internal var tucking by mutableStateOf(false)
-    /** 收起动效放完、窗口已经挪到屏幕外,等下一帧再换成半圆(这一帧画面上什么都没有,不闪)。 */
+    /** The collapse animation has finished and the window is already off-screen; wait one frame before switching to the half-circle (nothing is drawn on that frame, so nothing flashes). */
     internal var tuckPending by mutableStateOf(false)
     internal var tuckJob: Job? = null
     internal var dragStartX = 0
@@ -407,15 +407,15 @@ class CapsuleController(
             resetTaps()
             snap?.cancel()
             val wasHidden = edgeHidden || tuckPending
-            // 刚收起、还差一帧换半圆时抓住它:就当作已经藏起来了
+            // Caught just after collapsing, one frame before the half-circle switch: treat it as already hidden
             tuckPending = false
-            // 先立起 dragging:紧接着的 wake() 里会 fade,那里看见正在拖就不再 place,窗口不先跳回停靠位。
-            // 从半圆拖出来这一下直接到位(拖动要跟手),点开、自动隐藏仍照常放动效
+            // Set dragging first: the immediate wake() fades, and seeing a drag there it stops placing, so the window does not jump back to the docked position first.
+            // Dragging out of the half-circle goes straight into place (the drag must follow the finger); tapping open and auto-hide still animate as usual
             dragging = true
             revealInstant = wasHidden
             wake()
-            // 窗口一直是能拖的那颗那么大(藏起来时也一样,见 [CapsuleEdge.tuckedOffset]):
-            // 拖出来只是挪位置、不改窗口尺寸,系统不会跑缩放过渡,从第一帧就跟手
+            // The window always stays as large as the draggable ball (also when hidden, see [CapsuleEdge.tuckedOffset]):
+            // dragging out only moves it without resizing, so the system runs no scale transition and it follows the finger from the first frame
             dragStartX = if (wasHidden) CapsuleDocking.tuckedX(dock.side, a, w.width)
                 else CapsuleDocking.dockedX(dock.side, a, w.width)
             dragStartY = placedY
@@ -552,15 +552,15 @@ class CapsuleController(
         /** Window height of the capsule and of that bar including the shadow margin (used when placing the height by ratio). */
         const val PILL_DP = 40 + 16
         /**
-         * 一颗(圆形图标)连同四周阴影边的窗口宽高:胶囊窗口平时就是这个大小,**藏起来时也不变小**,
-         * 只是整块挪到屏幕外只留 [SLIVER_DP];出来时窗口尺寸不变,系统不会跑缩放过渡,拖动第一帧就跟手。
+         * Window size of the ball (round icon) including its shadow margin: the capsule window normally has this size and **does not shrink when hidden**,
+         * it is merely moved off-screen leaving only [SLIVER_DP]; when it comes out the window size is unchanged, so the system runs no scale transition and dragging follows the finger from the first frame.
          */
         const val BALL_DP = 40 + 16
-        /** 藏起来时露在屏幕边上的半圆宽度。 */
+        /** Width of the half-circle left visible at the screen edge when hidden. */
         const val SLIVER_DP = 20
         const val BAR_DP = 48 + 16
         const val SNAP_MS = 220L
-        /** 收起动效放完后等下一帧才换半圆;超过这么久还没等到帧(浮层帧停了)就直接换。 */
+        /** After the collapse animation, wait one frame before switching to the half-circle; if no frame arrives within this time (overlay frames stopped), switch anyway. */
         const val TUCK_COMMIT_MS = 50L
 
         const val ROTATE_SETTLE_MS = 300L

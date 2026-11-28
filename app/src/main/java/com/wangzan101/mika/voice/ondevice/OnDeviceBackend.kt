@@ -2,37 +2,37 @@ package com.wangzan101.mika.voice.ondevice
 
 import java.io.File
 
-/** 一个本机推理后端,比如 sherpa-onnx。按清单里包的 [VoicePackEntry.backend] 找到它。 */
+/** A local inference backend, such as sherpa-onnx. Found by a pack's [VoicePackEntry.backend]. */
 interface OnDeviceSttBackend {
-    /** 和清单的 `backend` 字段对应,如 `sherpa-onnx`。 */
+    /** Matches the manifest's `backend` field, for example `sherpa-onnx`. */
     val id: String
 
-    /** 这个后端认不认这种模型([VoicePackEntry.family])。 */
+    /** Whether this backend recognises this kind of model ([VoicePackEntry.family]). */
     fun supports(family: String): Boolean
 
-    /** 这台设备能不能跑(处理器架构)。 */
+    /** Whether this device can run it (CPU architecture). */
     fun abiSupported(): Boolean
 
-    /** 加载一个已安装、已校验的包;失败抛 [OnDeviceSttException]。可能很慢,在后台线程调。 */
+    /** Loads an installed, verified pack; throws [OnDeviceSttException] on failure. May be slow, so call it off the main thread. */
     fun load(pack: InstalledVoicePack, options: EngineOptions): OnDeviceSttEngine
 }
 
-/** 加载好的一个模型,常驻内存,直到 [close]。 */
+/** A loaded model that stays in memory until [close]. */
 interface OnDeviceSttEngine : AutoCloseable {
-    /** 16 kHz 单声道 PCM 进、文字出。[language] 是 ISO 639 语言部分,null 是自动检测。 */
+    /** Takes 16 kHz mono PCM and returns text. [language] is an ISO 639 language part; null means auto-detect. */
     suspend fun transcribe(pcm: ShortArray, language: String?): String
 }
 
 data class EngineOptions(val threads: Int) {
     companion object {
-        /** 线程数取 CPU 核数和 4 中较小的那个。 */
+        /** Threads: the smaller of the CPU core count and 4. */
         fun default() = EngineOptions(minOf(Runtime.getRuntime().availableProcessors(), 4))
     }
 }
 
-/** 清单里一个包,加上安装位置;文件按 role 取路径,不按文件名。 */
+/** A pack from the manifest plus its install location; files are addressed by role, not by name. */
 data class InstalledVoicePack(val entry: VoicePackEntry, val dir: File) {
-    /** [role] 对应的文件;清单里这个包没有这个 role 时抛 [OnDeviceSttException.Kind.Missing]。 */
+    /** The file for [role]; throws [OnDeviceSttException.Kind.Missing] when the pack has no such role. */
     fun file(role: String): File {
         val f = entry.files.firstOrNull { it.role == role }
             ?: throw OnDeviceSttException(OnDeviceSttException.Kind.Missing, "voice pack ${entry.id} has no '$role' file")
@@ -40,19 +40,19 @@ data class InstalledVoicePack(val entry: VoicePackEntry, val dir: File) {
     }
 }
 
-/** 本机识别的失败,按 [kind] 分类,接入语音目录时再换成 `VoiceModelError`。 */
+/** An on-device recognition failure, classified by [kind] and mapped to `VoiceModelError` when it reaches the voice catalog. */
 class OnDeviceSttException(val kind: Kind, message: String, cause: Throwable? = null) : Exception(message, cause) {
     /**
-     * [Corrupt] 只用于加载失败(文件读不出、模型建不起来),界面会让用户重新下载;
-     * [Failed] 是模型已经加载好、这一次解码出了意外,重新下载没用,只让用户重试。
+     * [Corrupt] is only for load failures (unreadable files, the model cannot be built), and the UI asks the user to download again;
+     * [Failed] means the model loaded but this decode failed unexpectedly, so downloading again will not help and the UI only offers a retry.
      */
     enum class Kind { Missing, Corrupt, OutOfMemory, Timeout, Unsupported, Failed }
 }
 
-/** 后端注册表:构造时传入列表,测试换成假的。 */
+/** Backend registry: pass the list at construction; tests substitute fakes. */
 class OnDeviceBackends(private val backends: List<OnDeviceSttBackend> = listOf(SherpaOnnxBackend())) {
     fun find(id: String): OnDeviceSttBackend? = backends.firstOrNull { it.id == id }
 
-    /** 有这个后端、而且它认这种模型;清单解析时用它筛掉当前版本跑不了的包。 */
+    /** The backend exists and recognises this model; manifest parsing uses it to hide packs this build cannot run. */
     fun supports(backend: String, family: String): Boolean = find(backend)?.supports(family) == true
 }

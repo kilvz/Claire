@@ -27,14 +27,14 @@ sealed interface SpeechEngineSpec {
     data class Bailian(val model: String, val region: BailianRegion, val workspace: String = "", val language: AsrLanguage = AsrLanguage.Auto) : SpeechEngineSpec
     /** A vendor's own recognition API (upload per utterance). */
     data class Vendor(val model: String) : SpeechEngineSpec
-    /** 本机离线识别,用已安装的语音包 [packId]。 */
+    /** On-device offline recognition with the installed voice pack [packId]. */
     data class OnDevice(val packId: String) : SpeechEngineSpec
     data class Unavailable(val why: Why) : SpeechEngineSpec
     /**
-     * [SystemNoResponse]:手机自带识别系统说有,但请求发过去一直没有回应(已记下,用户重新选它时清掉)。
-     * [SystemFailed]:手机自带识别未能启动,可以重试;不据此认定服务不存在或麦克风被占用。
-     * [VoicePackMissing]:选中的本机语音包没装(比如从备份恢复后),下载后不用重新选就能用。
-     * [OnDeviceUnsupported]:这台设备跑不了本机识别(处理器架构不支持),或者是通话这种用不了它的场合。
+     * [SystemNoResponse]: the built-in recognition says it is available but never answers a request (remembered, and cleared when the user selects it again).
+     * [SystemFailed]: built-in recognition could not start and can be retried; this alone does not mean the service is absent or the microphone is busy.
+     * [VoicePackMissing]: the selected on-device pack is not installed (for example after a backup restore); once downloaded it works without re-selecting.
+     * [OnDeviceUnsupported]: this device cannot run on-device recognition (unsupported CPU architecture), or this is a case such as calls where it cannot be used.
      */
     enum class Why {
         Off, NoSystemNoModel, SystemGone, SystemNoResponse, SystemFailed, ProviderGone, DoubaoNotConfigured, BailianNotConfigured,
@@ -45,8 +45,8 @@ sealed interface SpeechEngineSpec {
 /** Matches the user's choice and the device's capabilities against the available providers to decide which engine is used this time. Pure function, touches no platform APIs. */
 object SpeechResolver {
     /**
-     * [autoPack] 是「自动」可以退到的已安装语音包(见 [com.wangzan101.mika.voice.ondevice.OnDeviceAuto]);
-     * 只有手机自带识别不能用时才用它,其他选择不看它。
+     * [autoPack] is the installed pack "Auto" can fall back to (see [com.wangzan101.mika.voice.ondevice.OnDeviceAuto]);
+     * it is used only when built-in recognition is unusable, and other choices ignore it.
      */
     fun resolve(
         choice: SpeechChoice,
@@ -60,8 +60,8 @@ object SpeechResolver {
         is SpeechChoice.FunAsr -> SpeechEngineSpec.FunAsr(choice.url, choice.language)
         // Whether a key is stored is checked later by VoiceInput when it opens the session (keys are not part of the selection); this only goes by the selection
         is SpeechChoice.Bailian -> SpeechEngineSpec.Bailian(choice.model, choice.region, choice.workspace, choice.language)
-        // 自带识别能用就用它(能边说边出字);不能用时退到装好的语音包;都没有就照实说、指去设置,
-        // 不悄悄改用要花钱的服务商模型
+        // Use built-in recognition when usable (it produces text while speaking); fall back to an installed pack when not; otherwise say so plainly and point to settings
+        // rather than silently switching to a paid provider model
         SpeechChoice.Auto -> when {
             system.usable -> SpeechEngineSpec.System(system.onDevice)
             autoPack != null -> SpeechEngineSpec.OnDevice(autoPack)

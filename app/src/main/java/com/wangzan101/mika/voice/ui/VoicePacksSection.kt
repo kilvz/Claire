@@ -67,8 +67,8 @@ import java.io.IOException
 import java.util.Locale
 
 /**
- * 设置 › 模型 › 语音输入 › 离线语音包:每个包一张卡片(名称、语言、大小、许可、状态和操作)。
- * 从语音输入页和「还不能语音输入」的「下载离线语音包」进来。设备一个包都跑不了时整页只剩说明(入口本来也不显示)。
+ * Settings › Models › Voice input › Offline voice packs: one card per pack (name, languages, size, license, status and actions).
+ * Reached from the voice input page and from "Download offline voice pack" when voice input is not available yet. When no pack can run on the device the page shows only the explanation (the entry point is hidden anyway).
  */
 @Composable
 fun VoicePacksScreen(onBack: () -> Unit) {
@@ -80,7 +80,7 @@ fun VoicePacksScreen(onBack: () -> Unit) {
     }
 }
 
-/** 「离线语音包」一节:说明、最新一条结果提示、每个包一张卡片,以及流量和删除的确认框。 */
+/** The "Offline voice packs" section: the explanation, the latest result notice, one card per pack, and confirmation dialogs for metered downloads and deletion. */
 @Composable
 fun VoicePacksSection(viewModel: VoicePacksViewModel) {
     if (!viewModel.visible) return
@@ -90,14 +90,14 @@ fun VoicePacksSection(viewModel: VoicePacksViewModel) {
     val notice by viewModel.notice.collectAsState()
     val mirrorEnabled by viewModel.mirrorEnabled.collectAsState()
     var deleting by remember { mutableStateOf<VoicePackEntry?>(null) }
-    // 选文件的系统页回来时要知道是给哪个包导入的
+    // Remember which pack an import is for while the system file picker is open
     var importFor by rememberSaveable { mutableStateOf<String?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         val entry = cards.firstOrNull { it.entry.id == importFor }?.entry
         importFor = null
         if (entry != null && uris.isNotEmpty()) viewModel.import(entry, importInputs(context, uris))
     }
-    // 回到前台时重看文件:可能在别处被删了、装上了
+    // Re-check files when returning to the foreground: they may have been deleted or installed elsewhere
     LifecycleResumeEffect(viewModel) {
         viewModel.refresh()
         onPauseOrDispose {}
@@ -108,7 +108,7 @@ fun VoicePacksSection(viewModel: VoicePacksViewModel) {
             stringResource(R.string.voice_packs_lead), Modifier.padding(top = 4.dp, bottom = 12.dp),
             style = MikaType.Body, color = MikaTheme.colors.ink2,
         )
-        // 和关于页「使用镜像下载」是同一个开关:国内连 GitHub 常常很慢,放在下载的地方让人看得到
+        // Same switch as "Use mirrors for downloads" on the About page: GitHub is often slow from some regions, so it is shown where downloads happen
         GroupCard {
             ListRow(
                 MikaIcons.Link,
@@ -200,7 +200,7 @@ private fun VoicePackCardView(
                 stringResource(R.string.voice_pack_meta, languagesText(entry), size(context, entry.totalBytes), entry.license.name),
                 Modifier.padding(top = 2.dp), style = MikaType.Caption, color = c.ink3,
             )
-            // 状态这一行读屏读得出来:下载中时连百分比一起读
+            // Screen readers announce this status line, including the percentage while downloading
             Text(
                 status, Modifier.padding(top = 8.dp).testTag("voice-pack-status-$id"),
                 style = MikaType.Hint, color = if (card.status == VoicePackStatus.Corrupt) c.warn else c.ink2,
@@ -217,7 +217,7 @@ private fun VoicePackCardView(
                 else LinearProgressIndicator(modifier = bar)
             }
             if (progress?.phase == DownloadPhase.Failed) {
-                // 没开镜像时先指给用户镜像这条路,连不上 GitHub 多半是这个原因
+                // With mirrors off, point the user at mirrors first; unreachable GitHub is usually the cause
                 val failed = if (mirrorEnabled) R.string.voice_pack_download_failed else R.string.voice_pack_download_failed_mirror_off
                 Text(
                     stringResource(failed), Modifier.padding(top = 6.dp).testTag("voice-pack-failed-$id"),
@@ -235,8 +235,8 @@ private fun VoicePackCardView(
                     card.importing -> Unit
                     card.status == VoicePackStatus.Installed -> {
                         PackButton(R.string.voice_pack_delete, "voice-pack-delete-$id", onDelete, ButtonKind.Tonal)
-                        // 大小对、内容坏了(用的时候报「语音包已损坏」)也还是「已安装」:同一版本重新下载覆盖,
-                        // 不经过删除,选择和备援链照留(删除会把选择改回「自动」)
+                        // Correct sizes but bad content (reported as "voice pack damaged" when used) still counts as installed: re-downloading the same version overwrites it
+                        // without deleting, so the selection and fallback chain stay (deleting would reset the selection to "Auto")
                         PackButton(R.string.voice_pack_redownload, "voice-pack-redownload-$id", onDownload, ButtonKind.Text)
                     }
                     card.status == VoicePackStatus.UpdateAvailable -> {
@@ -249,7 +249,7 @@ private fun VoicePackCardView(
                     }
                     else -> PackButton(R.string.voice_pack_download, "voice-pack-download-$id", onDownload)
                 }
-                // 装好的包不用再导入、复制地址;别的状态都给离线用户留着这两条路
+                // Installed packs need neither import nor address copying; other states keep both paths for offline users
                 if (idle && card.status != VoicePackStatus.Installed) {
                     PackButton(R.string.voice_pack_import, "voice-pack-import-$id", onImport, ButtonKind.Tonal)
                     PackButton(R.string.voice_pack_copy_urls, "voice-pack-copy-$id", onCopy, ButtonKind.Text)
@@ -281,7 +281,7 @@ private fun statusText(card: VoicePackCard, context: Context): String {
     }
 }
 
-/** 语言不多时写出名字(按界面语言),多了只写个数。 */
+/** With few languages, list their names (in the UI language); with many, just the count. */
 @Composable
 private fun languagesText(entry: VoicePackEntry): String {
     val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
@@ -292,7 +292,7 @@ private fun languagesText(entry: VoicePackEntry): String {
 
 private const val MAX_NAMED_LANGUAGES = 5
 
-/** 第一个是要显示的话,第二个是不是要用户处理的问题(用红字)。 */
+/** First is the text to show, second is whether the user must act (shown in red). */
 @Composable
 private fun noticeText(n: VoicePackNotice): Pair<String, Boolean> {
     val context = LocalContext.current
@@ -315,7 +315,7 @@ private fun noticeText(n: VoicePackNotice): Pair<String, Boolean> {
     }
 }
 
-/** 页面每回到前台一次加一;拿它当 remember 的键,回来时重看文件。 */
+/** Increments each time the page returns to the foreground; used as a remember key to re-check files on return. */
 @Composable
 internal fun rememberResumeCount(): Int {
     var count by remember { mutableIntStateOf(0) }
@@ -327,8 +327,8 @@ internal fun rememberResumeCount(): Int {
 }
 
 /**
- * 选择列表里本机语音包那一项的「需要下载」标注:模型和选择都在,文件却不在(从备份恢复、被删)。
- * [resumed] 变了(回到这一页)或目录变了才重看文件。
+ * The "download required" badge on an on-device pack in the selection list: the model and selection exist but the files do not (restored from backup, deleted).
+ * Files are re-checked only when [resumed] changes (returning to this page) or the catalog changes.
  */
 @Composable
 internal fun voicePackBadge(environment: VoiceModelEnvironment, snapshot: VoiceCatalogSnapshot, resumed: Int): (VoiceOption) -> String? {
@@ -346,7 +346,7 @@ private fun DownloadProgress.fraction(): Float? =
 
 private fun size(context: Context, bytes: Long): String = Formatter.formatShortFileSize(context, bytes)
 
-/** 用户选的文件:显示名从系统取(拿不到用地址的最后一段),每次打开都从头读。 */
+/** A file the user picked: the display name comes from the system (falling back to the last path segment), and every open reads from the start. */
 private fun importInputs(context: Context, uris: List<Uri>): List<ImportInput> = uris.map { uri ->
     val name = runCatching {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->

@@ -31,66 +31,66 @@ import java.util.zip.ZipInputStream
 import kotlin.coroutines.coroutineContext
 
 /**
- * 语音包的下载、手动导入和删除,设置页的语音包卡片调它(本身没有界面)。
+ * Downloading, manual import and deletion of voice packs, called by the voice-pack cards in settings (it has no UI of its own).
  *
- * - **同一个包同时只有一个操作**:下载和导入互斥,第二个请求不排队,`download` 返回 false、`import` 返回 [ImportResult.Busy];
- *   [busy] 可以给界面判断。删除不算第二个请求:它先取消正在跑的下载,等任务彻底结束(或等正在进行的导入做完),再删。
- * - 下载和导入都经 [VoicePackStore] 建 staging、全部通过后 [VoicePackStore.commit] 一次生效,再把模型写进语音目录
- *   ([VoiceCatalogStore.installVoicePack])。失败、取消都 [VoicePackStore.abandon],staging 不留;提交失败时旧版本照用、目录不变。
- *   `commit` 在新版本改名生效后删旧版本时也可能抛错,这时重新看一眼 [VoicePackStore.installed]:装上了就算成功
- *   (残留的旧版本由下次启动的 `cleanup` 清掉)。
- * - 下载只在用户点按时开始([download] 不会被别处自动调用);走应用代理,不绑定 Wi-Fi。开始前界面先调 [preflight]。
- * - 哈希和文件读写都在 [io] 上。
+ * - **One operation per pack at a time**: downloads and imports exclude each other; a second request does not queue, `download` returns false and `import` returns [ImportResult.Busy];
+ *   [busy] lets the UI check. Deletion is not a second request: it cancels a running download first, waits for that task to end completely (or for a running import to finish), then deletes.
+ * - Downloads and imports both create staging through [VoicePackStore] and call [VoicePackStore.commit] once everything passes, then write the model into the voice catalog
+ *   ([VoiceCatalogStore.installVoicePack]). Failures and cancellations call [VoicePackStore.abandon] and leave no staging; if the commit fails, the old version stays usable and the catalog is unchanged.
+ *   `commit` can also throw while deleting old versions after the new one is renamed into place; check [VoicePackStore.installed] again then: if it is installed, count it as success
+ *   (leftover old versions are removed by the next launch's `cleanup`).
+ * - Downloads start only when the user taps ([download] is never called automatically); they use the app proxy and do not bind to Wi-Fi. The UI calls [preflight] first.
+ * - Hashing and file I/O run on [io].
  */
 class VoicePackInstaller(
     private val catalog: VoicePackCatalog,
     private val store: VoicePackStore,
     private val download: VerifiedDownload,
     private val mirrors: () -> MirrorSettings,
-    /** 当前网络是否按流量计费;产品里是 `ConnectivityManager.isActiveNetworkMetered()`。 */
+    /** Whether the current network is metered; in the product this is `ConnectivityManager.isActiveNetworkMetered()`. */
     private val metered: () -> Boolean,
     private val voiceCatalog: VoiceCatalogStore,
     private val engines: OnDeviceEngines,
     private val backends: OnDeviceBackends = OnDeviceBackends(),
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    /** 下载前检查的结果;顺序是设备不支持 → 空间不够 → 按流量计费要确认。 */
+    /** Result of the pre-download check, in order: unsupported device → not enough space → metered confirmation. */
     sealed interface Preflight {
         data object Ready : Preflight
-        /** 按流量计费的网络:先告诉用户要下 [bytes] 字节,确认后再 [download]。 */
+        /** Metered network: tell the user [bytes] will be downloaded and call [download] after confirmation. */
         data class ConfirmMetered(val bytes: Long) : Preflight
         data class NoSpace(val needed: Long, val free: Long) : Preflight
         data object UnsupportedDevice : Preflight
     }
 
-    /** 导入的一个输入:用户选的一个文件(单个模型文件,或整包 zip)。[name] 是显示名,[open] 每次调都从头读。 */
+    /** One import input: a file the user picked (a single model file or a full zip). [name] is the display name; [open] reads from the start each time. */
     data class ImportInput(val name: String, val open: () -> InputStream)
 
     sealed interface ImportResult {
         data object Installed : ImportResult
-        /** 选的文件里没有清单里的这些文件。 */
+        /** The picked files do not contain these files from the manifest. */
         data class Missing(val files: List<String>) : ImportResult
-        /** 这个文件大小或 SHA-256 和清单对不上。 */
+        /** This file's size or SHA-256 does not match the manifest. */
         data class Mismatch(val file: String) : ImportResult
-        /** 这个包正在下载或导入。 */
+        /** This pack is downloading or importing. */
         data object Busy : ImportResult
         data class NoSpace(val needed: Long, val free: Long) : ImportResult
         data object UnsupportedDevice : ImportResult
-        /** 读不出来(文件打不开、zip 坏了)或写不进去。 */
+        /** Cannot read (file unreadable, corrupt zip) or cannot write. */
         data class Failed(val error: Throwable) : ImportResult
     }
 
-    /** 每个包一把锁:下载从开始到任务彻底结束、导入从头到尾、删除时都拿着它。 */
+    /** One lock per pack, held from the start of a download until the task ends completely, for a whole import, and while deleting. */
     private val locks = ConcurrentHashMap<String, Mutex>()
 
     private fun lock(entry: VoicePackEntry) = locks.getOrPut(entry.id) { Mutex() }
 
-    /** 这个包有下载或导入在进行。 */
+    /** A download or import is running for this pack. */
     fun busy(entry: VoicePackEntry): Boolean = lock(entry).isLocked
 
     /**
-     * 一个文件的下载来源,按顺序:用户的镜像(开着时,用户排的顺序)+ Release 地址、官方 Release 地址、上游固定提交地址。
-     * 每个都过 [DownloadUrls.requireTrusted];不合格的(比如用户填了个不是 HTTPS 的镜像)直接不用。
+     * The download sources for one file, in order: the user's mirrors (when enabled, in the user's order) + release address, the official release address, and the pinned upstream commit address.
+     * Each passes [DownloadUrls.requireTrusted]; invalid ones (for example a mirror the user entered without HTTPS) are skipped.
      */
     fun sources(entry: VoicePackEntry, file: VoicePackFile): List<String> {
         val settings = mirrors()
@@ -107,7 +107,7 @@ class VoicePackInstaller(
         }.map { it.first }.distinct()
     }
 
-    /** 「复制下载地址」:每个文件的官方 Release 地址,一行一个。 */
+    /** "Copy download address": the official release address of each file, one per line. */
     fun downloadUrls(entry: VoicePackEntry): String = entry.files.joinToString("\n") { catalog.releaseUrl(entry, it) }
 
     fun preflight(entry: VoicePackEntry): Preflight {
@@ -118,12 +118,12 @@ class VoicePackInstaller(
     }
 
     /**
-     * 开始下载(用户点「下载」,[preflight] 之后)。这个包已经有下载或导入在进行时什么都不做,返回 false;
-     * 一个可用的来源都没有时也返回 false。进度看 [progress]。
+     * Starts a download (after [preflight], when the user taps "Download"). If the pack is already downloading or importing, does nothing and returns false;
+     * also returns false when no source is usable. Watch [progress] for progress.
      *
-     * 在调用线程上只拿这个包的锁、算地址(第一次会读镜像设置),不碰 staging:建 staging(会删上次的残留)在下载任务里、
-     * 后台线程上做。锁一直拿到任务彻底结束;放弃 staging、放开锁挂在任务自己的结束上([VerifiedDownload.start] 的 onEnd),
-     * 不靠另起的协程,所以 scope 被取消也不会漏掉。
+     * On the caller's thread it only takes the pack lock and computes addresses (reading mirror settings the first time) and never touches staging: staging (which deletes previous leftovers) is created inside the download task
+     * on a background thread. The lock is held until the task ends completely; abandoning staging and releasing the lock are hooked to the task's own completion ([VerifiedDownload.start]'s onEnd),
+     * not to a separate coroutine, so a cancelled scope cannot miss them.
      */
     fun download(entry: VoicePackEntry): Boolean {
         val lock = lock(entry)
@@ -139,11 +139,11 @@ class VoicePackInstaller(
             started = download.start(
                 key(entry), files,
                 prepare = {
-                    // 空的新目录,登记为正在用;只有锁住的这一个操作会碰它
+                    // A fresh empty directory, registered as in use; only this locked operation touches it
                     check(store.stagingDir(entry) == staging) { "unexpected staging dir" }
                 },
                 onEnd = {
-                    // 成功时 staging 已改名走,这一步什么都不做;失败、取消时清掉 staging、撤销登记。
+                    // On success staging has been renamed away and this does nothing; on failure or cancellation it clears staging and releases the registration.
                     try {
                         store.abandon(entry)
                     } finally {
@@ -152,7 +152,7 @@ class VoicePackInstaller(
                 },
             ) { install(entry, staging) }
         } finally {
-            // 没开始(没来源、key 被占、start 抛错):staging 还没建,只放开锁
+            // Did not start (no source, key held, start threw): staging was never created, so just release the lock
             if (!started) lock.unlock()
         }
         return started
@@ -160,14 +160,14 @@ class VoicePackInstaller(
 
     fun progress(entry: VoicePackEntry): StateFlow<DownloadProgress> = download.progress(key(entry))
 
-    /** 取消下载;staging 在任务彻底停下后清掉,之后 [busy] 变回 false。 */
+    /** Cancels the download; staging is removed once the task stops completely, and [busy] turns false afterwards. */
     fun cancel(entry: VoicePackEntry) = download.cancel(key(entry))
 
     /**
-     * 从用户选的文件导入:[inputs] 可以是几个单独的文件,也可以是 zip(条目可以带一层 `<包id>/` 目录),混着也行。
-     * 文件名按清单名对,Release 附件名 `<包id>--<文件名>` 也认;清单里没有的文件不管。
-     * zip 条目只认「文件名」或「`<包id>/`文件名」两种,`..`、绝对路径、别的子目录一律跳过,写入的只会是 staging 里的清单文件名。
-     * 每个文件最多写到清单大小,再多就停下报 [ImportResult.Mismatch](防 zip 炸弹)。全部大小和 SHA-256 对上才提交。
+     * Imports from files the user picked: [inputs] can be individual files or zips (entries may include one `<packId>/` directory), or a mix.
+     * Names are matched by manifest name; release asset names `<packId>--<fileName>` are also accepted; files not in the manifest are ignored.
+     * Zip entries are accepted only as "file name" or "`<packId>/`file name"; `..`, absolute paths and other subdirectories are always skipped, so only manifest file names inside staging are ever written.
+     * Each file is written at most up to its manifest size and then stops with [ImportResult.Mismatch] (zip-bomb guard). It commits only when every size and SHA-256 matches.
      */
     suspend fun import(entry: VoicePackEntry, inputs: List<ImportInput>): ImportResult {
         val lock = lock(entry)
@@ -182,10 +182,10 @@ class VoicePackInstaller(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    // 打不开(文件没了、没权限)、zip 坏了、条目名编码不对、写不进去
+                    // Cannot open (file gone, no permission), corrupt zip, bad entry-name encoding, or cannot write
                     ImportResult.Failed(e)
                 } finally {
-                    // 成功时 staging 已改名走,这里什么都不做
+                    // On success staging has been renamed away and this does nothing
                     runCatching { store.abandon(entry) }
                 }
             }
@@ -195,8 +195,8 @@ class VoicePackInstaller(
     }
 
     /**
-     * 删掉这个包:有下载先取消并等它彻底停下,正在导入的等它做完;再释放加载的模型、删文件、从语音目录去掉
-     * (选中的是它时语音输入回到「自动」)。删文件出错照样从目录去掉,错误再往外抛。
+     * Deletes this pack: cancels a running download and waits for it to stop completely, and waits for an import to finish; then releases loaded models, deletes files and removes it from the voice catalog
+     * (if it was selected, voice input returns to "Auto"). If deleting files fails it is still removed from the catalog, and the error is rethrown.
      */
     suspend fun delete(entry: VoicePackEntry) {
         download.cancel(key(entry))
@@ -223,7 +223,7 @@ class VoicePackInstaller(
         val written = HashSet<String>()
         val mismatched = HashSet<String>()
 
-        /** 把一个流写成清单里的 [file];已经有一份对上的就跳过。 */
+        /** Writes a stream as the manifest's [file]; skips it when an already matching copy exists. */
         fun accept(file: VoicePackFile, input: InputStream) {
             if (file.name in written) return
             val target = File(staging, file.name)
@@ -262,10 +262,10 @@ class VoicePackInstaller(
     }
 
     /**
-     * 提交 staging 并写进语音目录,再释放这个包已加载的模型(换了版本时旧模型不留在内存里,下次用到加载新的)。
-     * 提交抛错时,staging 已经不在(改名生效了)且新版本装全,说明是之后删旧版本出错,算成功;
-     * 否则往外抛,旧版本和目录不动。同一版本重新下载时改名失败,旧的那份会被挪回原处,`installed` 也不为空,
-     * 所以只看 `installed` 不够,要看 staging 还在不在。
+     * Commits staging and writes it into the voice catalog, then releases the pack's loaded model (so an old model does not stay in memory after a version change; the next use loads the new one).
+     * If the commit throws while staging is gone (the rename succeeded) and the new version is complete, deleting old versions failed afterwards and it counts as success;
+     * otherwise the error is rethrown and the old version and catalog stay. When re-downloading the same version the rename can fail and the old copy is moved back, so `installed` is not empty either;
+     * checking `installed` alone is not enough; check whether staging still exists.
      */
     private fun install(entry: VoicePackEntry, staging: File) {
         try {
@@ -277,7 +277,7 @@ class VoicePackInstaller(
         engines.release(entry.id)
     }
 
-    /** 流的内容写进 [target],最多写清单大小加一个字节就停;大小和 SHA-256 都对上返回 true。 */
+    /** Writes the stream into [target], stopping at the manifest size plus one byte; returns true when size and SHA-256 match. */
     private fun copyVerified(input: InputStream, target: File, file: VoicePackFile): Boolean {
         val sha = MessageDigest.getInstance("SHA-256")
         var total = 0L
@@ -312,7 +312,7 @@ class VoicePackInstaller(
     private fun supported(entry: VoicePackEntry): Boolean =
         backends.find(entry.backend)?.let { it.supports(entry.family) && it.abiSupported() } == true
 
-    /** 空间不够时返回(需要, 可用)。 */
+    /** Returns (needed, free) when space is short. */
     private fun space(entry: VoicePackEntry): Pair<Long, Long>? {
         val needed = entry.totalBytes + VoicePackStore.SPACE_MARGIN
         val free = store.freeBytes()
@@ -325,8 +325,8 @@ class VoicePackInstaller(
         fun key(entry: VoicePackEntry) = "voice-pack:${entry.id}"
 
         /**
-         * 用户给的名字对应清单里的哪个文件名:去掉一层 `<包id>/` 目录([allowDir],zip 条目才有)或 Release 附件的
-         * `<包id>--` 前缀。别的路径(`..`、绝对路径、更深的目录、反斜杠)一律返回 null。
+         * Which manifest file name a user-provided name maps to: strips one `<packId>/` directory ([allowDir], only for zip entries) or a release asset's
+         * `<packId>--` prefix. Any other path (`..`, absolute, deeper directories, backslashes) returns null.
          */
         internal fun packFileName(name: String, id: String, allowDir: Boolean): String? {
             val parts = name.split('/')
@@ -340,8 +340,8 @@ class VoicePackInstaller(
         }
 
         /**
-         * App 启动时、[VoicePackStore.cleanup] 之后调(后台线程):文件装着(哪个版本都行)、语音目录里却没有模型的包补登记。
-         * 提交把新版本改名生效后、写进语音目录前进程被杀,就会是这样;不补的话包装着却选不了。已登记的不动、不写。
+         * Called at app start, after [VoicePackStore.cleanup] (on a background thread): registers packs whose files are present (any version) but which have no model in the voice catalog.
+         * This happens when the process is killed after a commit renames the new version but before the catalog is written; without this the pack would be installed but unselectable. Registered packs are left alone and nothing is written.
          */
         fun restoreInstalled(catalog: VoicePackCatalog, store: VoicePackStore, voiceCatalog: VoiceCatalogStore) {
             voiceCatalog.restoreVoicePacks(catalog.packs.filter { store.installedAny(it) != null })
@@ -350,7 +350,7 @@ class VoicePackInstaller(
         @Volatile
         private var shared: VoicePackInstaller? = null
 
-        /** App 里共用的一份(和 [VoiceModelEnvironment] 共用同一个 [VoicePackStore]、清单和语音目录)。 */
+        /** One shared instance in the app (same [VoicePackStore], manifest and voice catalog as [VoiceModelEnvironment]). */
         fun get(context: Context): VoicePackInstaller = shared ?: synchronized(this) {
             shared ?: create(context.applicationContext).also { shared = it }
         }
@@ -362,10 +362,10 @@ class VoicePackInstaller(
             return VoicePackInstaller(
                 catalog = env.voicePackCatalog!!(),
                 store = env.voicePacks!!,
-                // 走应用代理(含 SOCKS),不绑定 Wi-Fi:下载只在用户点按时开始
+                // Go through the app proxy (including SOCKS), no Wi-Fi binding: downloads start only when the user taps
                 download = VerifiedDownload(NetProxy.shared.client(OkHttpClient.Builder().readTimeout(60, TimeUnit.SECONDS))),
                 mirrors = app.updateMirrors::snapshot,
-                // 拿不到网络信息时按计费处理,宁可多问一次
+                // Treat unknown network info as metered; better to ask once too often
                 metered = { connectivity?.isActiveNetworkMetered ?: true },
                 voiceCatalog = env.catalog,
                 engines = OnDeviceEngines.shared,

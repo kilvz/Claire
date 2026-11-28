@@ -5,15 +5,16 @@ import com.wangzan101.mika.voice.model.VoiceModelEnvironment
 import java.util.Locale
 
 /**
- * 「自动」在手机自带识别用不了时挑哪个语音包:推荐给这次识别语言的那个装了就用它,
- * 否则用清单里第一个装了的(模型不支持这种语言时由它自己判断),都没装就是 null。
- * 只在手机自带识别不能用时才问这里(见 [com.wangzan101.mika.voice.SpeechResolver])。
+ * Which voice pack "Auto" uses when the phone's built-in recognition is unusable: the pack recommended for this
+ * recognition language if it is installed, otherwise the first installed pack (the model decides when it does not
+ * support the language), and null when none is installed. Only asked when the built-in recognition cannot be used
+ * (see [com.wangzan101.mika.voice.SpeechResolver]).
  */
 object OnDeviceAuto {
 
     /**
-     * [speechTag] 是识别语言(BCP-47),按它换算成界面语言去找推荐;没给时按 [app](跟随系统时按系统语言)。
-     * [installed] 判断一个包能不能直接用。
+     * [speechTag] is the recognition language (BCP-47), converted to a UI language for the recommendation; when absent, [app] is used (the system language when following the system).
+     * [installed] decides whether a pack can be used directly.
      */
     fun pick(
         speechTag: String?,
@@ -28,8 +29,8 @@ object OnDeviceAuto {
     }
 
     /**
-     * App 里「装了」的意思:文件在(旧版本也算,照样能用)、这台设备跑得了它的引擎、语音目录里登记了它。
-     * 只看目录和文件大小,不算校验和,界面每次取卡片标签都会调。没有语音包环境(测试)或清单读不了时为 null。
+     * What "installed" means in the app: the files are present (an older version still counts and remains usable), this device can run its engine, and it is registered in the voice catalog.
+     * Only the directory and file sizes are checked, not checksums, because the UI calls this for every card label. Null when the voice-pack environment is absent (tests) or the manifest cannot be read.
      */
     fun installedPack(environment: VoiceModelEnvironment, speechTag: String?): String? {
         val store = environment.voicePacks ?: return null

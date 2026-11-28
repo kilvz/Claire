@@ -8,14 +8,8 @@
       "backend": "sherpa-onnx",
       "family": "whisper",
       "displayName": "Whisper Base",
-      "languages": [
-        "en",
-        "id"
-      ],
-      "recommendedFor": [
-        "en",
-        "id"
-      ],
+      "languages": ["en", "id"],
+      "recommendedFor": ["en", "id"],
       "files": [
         {
           "name": "base-encoder.int8.onnx",

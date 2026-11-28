@@ -27,12 +27,12 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 本机离线识别(已安装的语音包)。和整段上传识别一样:按着录音,松手后整段转写,所以它能当备援链的链头,
- * 也能接在云端模型后面。只认 [com.wangzan101.mika.voice.ondevice.OnDeviceSttBackend] /
- * [com.wangzan101.mika.voice.ondevice.OnDeviceSttEngine] 两个接口,不知道具体是哪个推理库。
+ * On-device offline recognition (an installed voice pack). Like whole-clip upload recognition, it records while held and transcribes the whole clip on release, so it can lead a fallback chain
+ * and can also sit behind a cloud model. It only knows the two interfaces [com.wangzan101.mika.voice.ondevice.OnDeviceSttBackend] /
+ * [com.wangzan101.mika.voice.ondevice.OnDeviceSttEngine] and does not know which inference library is underneath.
  *
- * 失败都换成 [VoiceModelError]:包不在是 [VoiceModelError.PackMissing],其余是 [VoiceModelError.OnDeviceFailed],
- * 都会换链上的下一个,也都不是网络错误。[budgetMs] 只为测试可换,默认按录音长短([OnDeviceTimeout.budgetMs])。
+ * Failures are mapped to [VoiceModelError]: a missing pack is [VoiceModelError.PackMissing] and everything else is [VoiceModelError.OnDeviceFailed];
+ * both move to the next entry in the chain and neither is a network error. [budgetMs] is replaceable only for tests and defaults to the clip length ([OnDeviceTimeout.budgetMs]).
  */
 class OnDeviceSttAdapter(
     private val catalog: () -> VoicePackCatalog,
@@ -55,15 +55,15 @@ class OnDeviceSttAdapter(
 
     override fun start(context: Context, model: ResolvedVoiceModel, language: String?, hooks: SttHooks): SpeechSession {
         spec(model)
-        // 通话的声音从外面送进来;第一版通话不用本机语音包(出字太慢)
+        // Call audio arrives from outside; the first version of calls does not use on-device packs (too slow to produce text)
         if (hooks.recorder != null) return FailedSession(SpeechFailure.Unavailable(SpeechEngineSpec.Why.OnDeviceUnsupported))
         prewarm(model)
         val transcribe = utterance(context, model, languageTag(context, language))
-        // 转写的上限由 utterance 自己按录音长短算,不套整段上传那 30 秒(到点会被当成「连不上」)
+        // The transcription limit is computed by utterance from the clip length, not the 30 s used for whole-clip upload (hitting that would look like a connection failure)
         return categorizedSession { ProviderSpeech(PcmRecorder(), transcribe, timeoutMs = Long.MAX_VALUE) }
     }
 
-    /** 按下说话时就在后台开始加载模型,和录音同时进行;出错留到转写时再报。 */
+    /** Starts loading the model in the background on press-to-talk, alongside recording; errors surface later at transcription. */
     override fun prewarm(model: ResolvedVoiceModel) {
         val pack = runCatching { installed(entry(packId(model))) }.getOrNull() ?: return
         engines.prewarm(pack)
@@ -72,37 +72,37 @@ class OnDeviceSttAdapter(
     override fun utterance(context: Context, model: ResolvedVoiceModel, language: String?): UtteranceTranscribe {
         val packId = packId(model)
         return { wav ->
-            // 每次现查:文件后来才下好也能直接用,删掉了就报「需要下载」
+            // Check fresh every time: files downloaded later work immediately, and deleted ones report "download required"
             val entry = entry(packId)
             val pack = installed(entry)
             try {
                 val pcm = Wav.decode(wav)
                 val code = OnDeviceLanguage.pick(language, entry.languages)
-                // 等模型加载(有自己的上限)不算在识别预算里
+                // Waiting for the model to load (with its own limit) is not counted in the recognition budget
                 val engine = engines.engine(pack)
                 val budget = budgetMs(pcm.size)
-                // 原生解码在 OnDeviceEngines 里单独跑,这里到点就能返回,不等它
+                // Native decoding runs separately in OnDeviceEngines, so this returns as soon as time is up without waiting for it
                 withTimeoutOrNull(budget) { engine.transcribe(pcm, code) }
-                    // 记成本机失败,不是网络超时:慢机器上不该显示「连不上」
+                    // Count as an on-device failure, not a network timeout: a slow device must not show "cannot connect"
                     ?: throw VoiceModelError.OnDeviceFailed("On-device recognition took longer than $budget ms")
             } catch (e: OnDeviceSttException) {
                 throw mapped(e, entry)
             } catch (e: VoiceModelError) {
                 throw e
             } catch (e: CancellationException) {
-                // 调用方自己被取消就照常往外传;调用方还在等,却拿到取消(比如加载被取消),算这一次本机失败,换下一个
+                // A cancellation of the caller propagates as usual; when the caller is still waiting but gets cancelled (for example loading was cancelled), count it as an on-device failure for this attempt and try the next one
                 currentCoroutineContext().ensureActive()
                 throw VoiceModelError.OnDeviceFailed("On-device recognition was cancelled", e)
             } catch (e: Exception) {
-                // 音频解不开、选语言出错等意外:也算本机失败,一定能换下一个(否则会被当成协议错误停在这里)
+                // Unexpected failures such as undecodable audio or language selection errors also count as on-device failures so the chain always moves on (otherwise they would stop here as protocol errors)
                 throw VoiceModelError.OnDeviceFailed("On-device recognition failed: ${e.message}", e)
             }
         }
     }
 
     /**
-     * 文件不在([OnDeviceSttException.Kind.Missing])只有包这时真的没装才说「需要下载」;
-     * 包还装着(模型被释放、换版本时正在识别)就是这一次本机失败,换下一个,不让用户去重新下载。
+     * A missing file ([OnDeviceSttException.Kind.Missing]) means "download required" only when the pack is really not installed at this moment;
+     * when the pack is still installed (the model was released or a version change is in progress) it is a failure of this attempt, so the chain moves on rather than sending the user to download again.
      */
     private fun mapped(error: OnDeviceSttException, entry: VoicePackEntry): VoiceModelError =
         if (error.kind == OnDeviceSttException.Kind.Missing && store.installedAny(entry) != null) {
@@ -120,7 +120,7 @@ class OnDeviceSttAdapter(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // 随 APK 的清单读不出来是打包问题,算本机不可用,不当成网络错误
+            // An unreadable APK-bundled manifest is a packaging problem: treat it as on-device unavailability, not a network error
             throw VoiceModelError.OnDeviceFailed("Voice pack catalog is unavailable", e)
         }
         return packs.entry(packId) ?: throw VoiceModelError.PackMissing(packId)

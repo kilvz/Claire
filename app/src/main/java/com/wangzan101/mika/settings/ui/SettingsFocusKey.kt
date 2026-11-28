@@ -1,14 +1,14 @@
 package com.wangzan101.mika.settings.ui
 
 /**
- * 设置页内部条目的定位标识: 搜索索引([SettingsSearchIndex])
- * 和各设置子页的定位高亮共用这里的常量,避免字符串手写拼错。
+ * Focus keys for items inside settings pages: the search index ([SettingsSearchIndex])
+ * and the focus highlight on each settings subpage share these constants so hand-written strings cannot drift.
  */
 object SettingsFocusKey {
-    // 首页
+    // Home
     const val PERSONAL_START = "personal_start"
 
-    // 任务运行
+    // Task runs
     const val AUTONOMOUS = "autonomous"
     const val KEEP_SCREEN_ON = "keep_screen_on"
     const val POCKET_GUARD = "pocket_guard"
@@ -30,45 +30,45 @@ object SettingsFocusKey {
     const val EXTERNAL_SCHEDULE = "external_schedule"
     const val OPERATING_PACE = "operating_pace"
 
-    // 手机操作
+    // Phone actions
     const val ACCESSIBILITY = "accessibility"
     const val SHIZUKU = "shizuku"
     const val SHELL_TRANSPORT = "shell_transport"
 
-    // 语言与外观
+    // Language and appearance
     const val APPEARANCE = "appearance"
     const val ACCENT_COLOR = "accent_color"
     const val BACKGROUND_SKIN = "background_skin"
     const val APP_LANGUAGE = "app_language"
 
-    // 悬浮胶囊
+    // Floating capsule
     const val CAPSULE_IDLE_OPACITY = "capsule_idle_opacity"
     const val CAPSULE_CARD_SIZE = "capsule_card_size"
     const val CAPSULE_HIDE_AT_EDGE = "capsule_hide_at_edge"
     const val CAPSULE_HIDE_FULLSCREEN = "capsule_hide_fullscreen"
     const val CAPSULE_QUICK_SETTINGS = "capsule_quick_settings"
 
-    // 通知
+    // Notifications
     const val SCHEDULED_QUIET = "scheduled_quiet"
     const val LIVE_TASK_UPDATES = "live_task_updates"
 
-    // 恢复与修复
+    // Recovery and repair
     const val RECENTS_EXCLUSION = "recents_exclusion"
     const val RECOVERY_A11Y = "recovery_accessibility"
     const val RECOVERY_BATTERY = "recovery_battery"
     const val RECOVERY_BOOT = "recovery_boot"
     const val RECOVERY_AUTO_WIRELESS = "recovery_auto_wireless"
 
-    // 文件与计算环境
+    // Files and compute environment
     const val SANDBOX_NETWORK = "sandbox_network"
     const val SANDBOX_USAGE = "sandbox_usage"
     const val SANDBOX_RESET = "sandbox_reset"
 
-    // 连接电脑
+    // Connect to a computer
     const val MCP_HISTORY = "mcp_history"
     const val REMOTE_DEVICE_ACCESS = "remote_device_access"
 
-    /** 全部页内定位标识,供单测核对索引没有漏标或拼错。 */
+    /** All in-page focus keys, so unit tests can check the index has no missing or mistyped entries. */
     val ALL: Set<String> = setOf(
         PERSONAL_START,
         AUTONOMOUS,

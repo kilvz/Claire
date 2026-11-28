@@ -113,7 +113,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
     internal fun workflowInterrupted(attemptId: String) {
         scope.launch(Dispatchers.IO) { workflows.complete(attemptId, false, "", "interrupted") }
     }
-    /** 这一步到了任务服务门口用户已暂停了 Mika:记失败,流程停在待确认,恢复后由用户决定。 */
+    /** The user paused Claire just as this step reached the task service: record a failure, leave the flow awaiting confirmation, and let the user decide after resuming. */
     internal fun workflowPaused(attemptId: String) {
         scope.launch(Dispatchers.IO) { workflows.complete(attemptId, false, "", com.wangzan101.mika.core.run.PauseFlag.REASON) }
     }
@@ -504,8 +504,8 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
     ) = synthesize(text)
 
     /**
-     * 在系统播放器里打开工作区的一段视频:经关口复制到缓存中转区再交出去,工作区本身不开放。
-     * 中转区只留最近一次的副本(换一段播放时删掉上一段),其余的启动时清掉。
+     * Opens a workspace video in the system player: it is copied into a cache relay area through the gate before being handed over, so the workspace itself is never exposed.
+     * The relay area keeps only the latest copy (the previous one is deleted when another is played); the rest is cleared at startup.
      */
     private suspend fun playWorkspaceVideo(conversationId: String, path: String) {
         val dirs = com.wangzan101.mika.cap.sandbox.SandboxDirs(this)
@@ -530,11 +530,11 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         runCatching { startActivity(intent) }
     }
 
-    /** 取工作区一段视频的首帧当聊天卡片封面(直接在闸门句柄上解码,不复制视频);读不出来返回 null。 */
+    /** Takes the first frame of a workspace video as the chat card cover (decoded directly on the gate handle without copying the video); null when it cannot be read. */
     private suspend fun videoPoster(conversationId: String, path: String): android.graphics.Bitmap? =
         com.wangzan101.mika.media.AndroidVideoPort(this, conversationId).poster(path, maxSide = 320)
 
-    /** 人工示范。onCreate 里建好；在那之前的无障碍事件不采集。 */
+    /** Manual demonstration. Built in onCreate; accessibility events before that are not collected. */
     lateinit var teach: TeachRuntime
         private set
     val teachReady: Boolean get() = ::teach.isInitialized
@@ -582,7 +582,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
             },
             conversations,
             mainModels = com.wangzan101.mika.chat.ui.ProviderMainModelCatalog(providers),
-            // 通话里在等主人回话时,这个对话里的下一句就是回话
+            // While a call waits for the owner to reply, the next line in this conversation is the reply
             ownerAnswer = { id, text -> ownerQuestions.answerIn(id, text) },
             followUps = followUpQueue.changes,
             serviceBusy = taskState.busy,
@@ -703,8 +703,8 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
     }
 
     /**
-     * 系统内存紧张时释放本机识别模型(几百 MB),下次用到再加载。界面刚退到后台(UI_HIDDEN)不算紧张:
-     * 悬浮胶囊里的语音输入还在用。
+     * Releases on-device recognition models (hundreds of MB) when system memory is tight, loading them again on next use. The UI just going to the background (UI_HIDDEN) does not count:
+     * voice input in the floating capsule may still be using them.
      */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
@@ -723,15 +723,15 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
             runCatching { updateMirrors.ensureLoaded() }
             runCatching { com.wangzan101.mika.task.AndroidDeviceFiles.cleanupStaging(SandboxDirs(this@MikaApp)) }
                 .onFailure { Log.w("MikaImport", "Could not clean device import staging", it) }
-            // 离线语音包:上次没下完的 staging、旧版本、清单里已没有的包
+            // Offline voice packs: staging left by an unfinished download, old versions, and packs no longer in the manifest
             runCatching {
-                // 和语音目录用同一份存放和清单(见 VoiceModelEnvironment)
+                // Same store and manifest as the voice catalog (see VoiceModelEnvironment)
                 val voice = com.wangzan101.mika.voice.model.VoiceModelEnvironment.get(this@MikaApp)
                 val packs = voice.voicePacks
                 if (packs != null) {
                     val catalog = voice.voicePackCatalog!!()
                     packs.cleanup(catalog)
-                    // 上次在提交和写进语音目录之间被杀:文件装着、目录里没有模型,补上
+                    // Killed last time between commit and writing the voice catalog: files are installed but no model is listed, so add it
                     com.wangzan101.mika.voice.ondevice.VoicePackInstaller.restoreInstalled(catalog, packs, voice.catalog)
                 }
             }.onFailure { Log.w("MikaVoice", "Could not clean voice packs", it) }
@@ -767,7 +767,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         com.wangzan101.mika.cap.phone.setup.RestoreWishSync(
             phone.hub, flags.capsuleModeChanges(), taskState.busy, phone.recoverySettings.consent,
             phone.recovery.accessibility,
-            // 完全退出或暂停了 Mika:都不让助手把 Mika 拉起来
+            // Fully quit or paused Claire: never let the assistant bring Claire back up
             kotlinx.coroutines.flow.combine(flags.quitChanges(), com.wangzan101.mika.settings.MikaPause.get(this).state) { q, p -> q || p },
         ).start()
         // Changes left behind by the previous abnormal exit (App muted) are restored here
@@ -793,17 +793,17 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         scope.launch { runCatching { com.wangzan101.mika.media.AudioShareExporter(this@MikaApp).cleanPending() } }
         // Empty shell entries left by the previous album save that was killed halfway
         scope.launch { runCatching { com.wangzan101.mika.cap.image.ImageExporter(this@MikaApp).cleanPending() } }
-        // 上次分享图片、视频复制到一半被杀留下的空壳条目
+        // Empty entries left when a shared image or video copy was killed midway last time
         scope.launch { runCatching { com.wangzan101.mika.media.ShareFileExporter(this@MikaApp).cleanPending() } }
-        // 上次存影片库写到一半被杀留下的空壳条目
+        // Empty entries left when a video-library save was killed midway last time
         scope.launch { runCatching { com.wangzan101.mika.media.VideoExporter(this@MikaApp).cleanPending() } }
-        // 上次进程留下的网页上传副本
+        // Web upload copies left by a previous process
         scope.launch { runCatching { WebFiles.clearStale(this@MikaApp, SandboxDirs(this@MikaApp).gate) } }
-        // 上次进程留下的视频播放副本
+        // Video playback copies left by a previous process
         scope.launch(Dispatchers.IO) { runCatching { java.io.File(cacheDir, VIDEO_PLAY_DIR).deleteRecursively() } }
-        // 上次进程下载到一半的生成视频
+        // Generated videos left half-downloaded by a previous process
         scope.launch(Dispatchers.IO) { runCatching { java.io.File(cacheDir, com.wangzan101.mika.media.AndroidVideoGenerationPort.CACHE_DIR).deleteRecursively() } }
-        // 更新已经装上后,关于页下好的安装包
+        // The update package downloaded on the About page after the update is already installed
         scope.launch(Dispatchers.IO) { runCatching { apkUpdater.dropInstalled() } }
         // If the runtime environment is not ready (first launch, after a Claire upgrade), prepare it in the background: no network access, invisible to the user
         if (!quit) RuntimePreparer.ensure(this)
@@ -869,5 +869,5 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
     }
 }
 
-/** 聊天视频卡片点开时的播放副本目录(cacheDir 下);和 res/xml/video_playback_files.xml 对应。 */
+/** Playback copy directory for an opened chat video card (under cacheDir); matches res/xml/video_playback_files.xml. */
 private const val VIDEO_PLAY_DIR = "videoplay"

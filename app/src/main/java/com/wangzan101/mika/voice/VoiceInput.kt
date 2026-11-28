@@ -41,9 +41,9 @@ class VoiceInput(
         SystemSpeech.capability(context, settings.systemSilent.value)
     },
     private val systemCompatibility: () -> Boolean = { SystemSpeech.serviceCompatibility() },
-    /** 「自动」在手机自带识别不能用时退到哪个已安装的语音包(按识别语言挑);没有为 null。 */
+    /** Which installed pack "Auto" falls back to when built-in recognition is unusable (chosen by recognition language); null when none. */
     private val autoPack: (speechTag: String?) -> String? = { tag -> OnDeviceAuto.installedPack(voiceModels, tag) },
-    /** 没指定识别语言时用的语言:跟 App 界面语言。 */
+    /** Language used when no recognition language is given: follows the app UI language. */
     private val appSpeechTag: () -> String = { SystemSpeech.speechTag(AppLanguage.current(context)) },
 ) : VoiceSource {
     private val context = context.applicationContext
@@ -59,8 +59,8 @@ class VoiceInput(
     }
 
     /**
-     * 本机语音包用不了时界面该说的原因:没装是「需要下载」(下好后不用重新选),设备跑不了照实说;
-     * 别的错误返回 null,照原来的处理。
+     * The reason the UI should give when an on-device pack is unusable: not installed means "download required" (no re-selection afterwards), an unsupported device is stated plainly;
+     * other errors return null and keep the previous handling.
      */
     private fun onDeviceWhy(error: Throwable): SpeechEngineSpec.Why? = when {
         error is VoiceModelError.PackMissing -> SpeechEngineSpec.Why.VoicePackMissing
@@ -72,7 +72,7 @@ class VoiceInput(
     private fun legacySpec(): SpeechEngineSpec =
         SpeechResolver.resolve(settings.choice.value, systemCapability(), providers.providers.value)
 
-    /** [speechTag] 只在「自动」要挑语音包时才取(取界面语言要碰系统)。 */
+    /** [speechTag] is read only when "Auto" must pick a pack (reading the UI language touches the system). */
     private fun migratedSpec(speechTag: () -> String?): SpeechEngineSpec {
         if (voiceModels.stt.catalog.state.value.error != null) {
             throw VoiceModelError.IncompleteConfig("Voice catalog is not readable")
@@ -80,7 +80,7 @@ class VoiceInput(
         return when (val selection = voiceModels.stt.current()) {
             SttSelection.Auto -> {
                 val system = systemCapability()
-                // 自带识别能用时不去看语音包:不让「自动」悄悄换成离线模型
+                // Do not look at voice packs while built-in recognition is usable: never let "Auto" silently switch to an offline model
                 val pack = if (system.usable) null else autoPack(speechTag())
                 SpeechResolver.resolve(SpeechChoice.Auto, system, emptyList(), pack)
             }
@@ -118,7 +118,7 @@ class VoiceInput(
         }
         val selection = voiceModels.stt.current()
         val ref = when (selection) {
-            // 自动退到语音包时用 spec 挑好的那个(同一个识别语言挑的),否则是手机自带识别
+            // When Auto falls back to a pack use the one spec already picked (for the same recognition language); otherwise use built-in recognition
             SttSelection.Auto -> (spec as? SpeechEngineSpec.OnDevice)?.let { OnDeviceCatalog.ref(it.packId) }
                 ?: SttSelectionController.SYSTEM_STT_REF
             SttSelection.Off -> return FailedSession(SpeechFailure.Unavailable(SpeechEngineSpec.Why.Off))
@@ -137,7 +137,7 @@ class VoiceInput(
             SttHooks()
         }
         return try {
-            // 自动不用备援链:它自己在自带识别和语音包之间挑
+            // Auto does not use the fallback chain: it chooses between built-in recognition and voice packs itself
             val backups = if (selection == SttSelection.Auto) emptyList() else voiceModels.stt.backupsFor(ref)
             voiceModels.stt.start(context, ref, tag, hooks, backups)
         } catch (error: CancellationException) {
