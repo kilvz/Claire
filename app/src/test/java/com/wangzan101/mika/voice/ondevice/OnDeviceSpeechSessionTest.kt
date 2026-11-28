@@ -7,6 +7,7 @@ import com.wangzan101.mika.voice.StreamingRecorder
 import com.wangzan101.mika.voice.model.VoiceModelError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
@@ -103,6 +104,8 @@ class OnDeviceSpeechSessionTest {
         assertEquals(SpeechEvent.Partial("", "hello"), events.receive())
         session.cancel()
         assertTrue(events.receiveCatching().isClosed)
+        // Stopping the recorder and closing the stream happen off the main thread; wait for the cleanup rather than racing it
+        withTimeout(2_000) { while (!capture.stopped || !stream.closed) delay(10) }
         assertTrue(capture.stopped)
         assertTrue(stream.closed)
     }

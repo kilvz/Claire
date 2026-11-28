@@ -79,6 +79,23 @@ class OnDeviceEnginesTest {
         }
     }
 
+    /** Waits on a real thread until the stuck load has really finished, retrying what a user's next press would do while it is still timing out. */
+    private suspend fun awaitEngine(engines: OnDeviceEngines, pack: InstalledVoicePack): OnDeviceSttEngine =
+        withContext(Dispatchers.IO) {
+            val deadline = System.nanoTime() + 5_000_000_000L
+            var last: OnDeviceSttException? = null
+            while (System.nanoTime() <= deadline) {
+                try {
+                    return@withContext engines.engine(pack)
+                } catch (e: OnDeviceSttException) {
+                    if (e.kind != OnDeviceSttException.Kind.Timeout) throw e
+                    last = e
+                    Thread.sleep(10)
+                }
+            }
+            throw last ?: OnDeviceSttException(OnDeviceSttException.Kind.Timeout, "load did not finish")
+        }
+
     @Test
     fun loadsOncePerPackVersion() = runTest {
         val backend = FakeBackend()
@@ -126,7 +143,7 @@ class OnDeviceEnginesTest {
             stuck.countDown()
         }
         // 超时后晚到的加载结果留着用,不重复加载
-        val late = withContext(Dispatchers.IO) { engines.engine(pack()) }
+        val late = awaitEngine(engines, pack())
         assertEquals("hello", late.transcribe(ShortArray(1), null))
         assertEquals(1, backend.loads.size)
     }
