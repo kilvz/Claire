@@ -133,4 +133,12 @@
     <string name="calls_delete_digit">Delete</string>
     <string name="calls_clear_draft">Clear draft</string>
     <string name="calls_reset_history_filters">Reset filters</string>
+    <string name="calls_default_greeting">Hello, I\'m Claire, an AI phone assistant. Is there anything you\'d like me to pass along?</string>
+    <string name="calls_task_greeting">Hello, I\'m Claire, an AI phone assistant. Is now a good time to talk?</string>
+    <string name="calls_closing_line">Our time is almost up, let\'s wrap up here. Goodbye.</string>
+    <string name="calls_audio_probe_ready">Audio path is ready, but two-way audio still needs a live test call</string>
+    <string name="calls_audio_probe_unavailable">Built-in helper could not detect phone audio</string>
+    <string name="calls_history_summary_updated">Summary updated</string>
+    <string name="calls_voice_briefing_left_foreground">Left foreground, call not placed</string>
+    <string name="calls_voice_briefing_greeting">Please tell me what this call is for. I\'m listening.</string>
 </resources>

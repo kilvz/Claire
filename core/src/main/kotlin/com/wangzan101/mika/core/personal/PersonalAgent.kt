@@ -1,7 +1,7 @@
 package com.wangzan101.mika.core.personal
 
 import com.wangzan101.mika.core.agent.Conversation
-import com.wangzan101.mika.core.agent.TokenEstimate
+import com.wangzan101.mika.core.model.TokenEstimate
 import com.wangzan101.mika.core.model.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel

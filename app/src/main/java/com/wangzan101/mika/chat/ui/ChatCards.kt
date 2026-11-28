@@ -204,7 +204,7 @@ internal fun StatusCard(
 
 /** Audio generated in this turn: name/start of the script, duration, play/stop; tapping the whole card plays it, tapping again stops. */
 @Composable
-internal fun GeneratedAudioCards(audios: List<com.wangzan101.mika.core.chat.GeneratedAudio>, vm: ChatViewModel) {
+internal fun GeneratedAudioCards(audios: List<com.wangzan101.mika.core.agent.GeneratedAudio>, vm: ChatViewModel) {
     val playback by vm.voice.collectAsState()
     val playing = playback is VoicePlayback.Playing || playback is VoicePlayback.Loading
     val c = MikaTheme.colors
@@ -239,7 +239,7 @@ internal fun GeneratedAudioCards(audios: List<com.wangzan101.mika.core.chat.Gene
 
 /** The video generated in this turn: first-frame cover, duration, opens in the system player. */
 @Composable
-internal fun GeneratedVideoCards(videos: List<com.wangzan101.mika.core.chat.GeneratedVideo>, vm: ChatViewModel) {
+internal fun GeneratedVideoCards(videos: List<com.wangzan101.mika.core.agent.GeneratedVideo>, vm: ChatViewModel) {
     val c = MikaTheme.colors
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         videos.forEach { v ->

@@ -5,12 +5,11 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import com.wangzan101.mika.MikaApp
 import com.wangzan101.mika.R
+import com.wangzan101.mika.enterForeground
 import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.task.TaskService
 import kotlinx.coroutines.CoroutineScope
@@ -35,14 +34,11 @@ class ChatGptSignInService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         TaskService.ensureChannels(this)
-        // After startForegroundService it must enter the foreground as soon as possible, even if it is about to stop; if it cannot enter the foreground, stop right here: the sign-in goes on as usual (just without this protection)
-        val foreground = runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-            } else {
-                startForeground(NOTIFICATION_ID, notification())
-            }
-        }.onFailure { Log.w(TAG, "sign-in service could not enter the foreground", it) }.isSuccess
+        // After startForegroundService we must enter the foreground quickly, even if we are about to stop; when that fails, stop here and sign-in proceeds (just without this protection)
+        val foreground = enterForeground(
+            NOTIFICATION_ID,
+            onFailure = { Log.w(TAG, "sign-in service could not enter the foreground", it) },
+        ) { notification() }
         if (intent?.action == ACTION_CANCEL) signIns.cancel()
         if (FeatureFlags.get(this).quitRequested()) signIns.cancel()
         if (!foreground || FeatureFlags.get(this).quitRequested()) {

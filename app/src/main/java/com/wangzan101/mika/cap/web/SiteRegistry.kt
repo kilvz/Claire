@@ -1,6 +1,7 @@
 package com.wangzan101.mika.cap.web
 
 import com.wangzan101.mika.core.cap.web.WebUrlPolicy
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -142,8 +143,8 @@ class SiteRegistry(private val dir: File, private val clock: () -> Long = System
     private fun save() {
         dir.mkdirs()
         if (corrupt) {
-            // Move the corrupted file aside and keep it, never overwrite it with new content
-            file.renameTo(File(dir, "$FILE.corrupt-${clock()}"))
+            // Move a corrupted file aside and keep it; never overwrite it with new content
+            AtomicFiles.quarantine(file, AtomicFiles.Quarantine.RenameCorrupt, now = clock(), dedupe = false)
             corrupt = false
         }
         val json = JsonArray(sites.values.map {
@@ -153,13 +154,8 @@ class SiteRegistry(private val dir: File, private val clock: () -> Long = System
                 it.challenge?.let { k -> put("challenge", k) }
             }
         }).toString()
-        // Write a temp file first and then rename it, so being killed mid-write does not leave half a file
-        val tmp = File(dir, "$FILE.tmp")
-        tmp.writeText(json)
-        if (!tmp.renameTo(file)) {
-            file.writeText(json)
-            tmp.delete()
-        }
+        // Write a temp file first, then rename it, so a kill halfway through does not leave half a file
+        AtomicFiles.write(file, json, durable = false, move = AtomicFiles.Move.Rename, fallback = AtomicFiles.Fallback.WriteDirect)
         publish()
     }
 

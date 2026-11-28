@@ -51,13 +51,16 @@ sealed class VoiceModelError(
     class Cancelled(cause: Throwable? = null) :
         VoiceModelError(VoiceErrorCategory.CANCELLED, "Voice operation cancelled", cause)
 
-    /** The selected (or fallback-chain) on-device pack is not installed, its files are incomplete, or it is gone from the manifest; the UI shows "Needs download". */
+    class NoSpeechDetected :
+        VoiceModelError(VoiceErrorCategory.SYSTEM_UNAVAILABLE, "No speech detected")
+
+    /** The selected on-device pack (or one in the fallback chain) is not installed, its files are incomplete, or it is gone from the manifest; the UI shows "Needs download". */
     class PackMissing(val packId: String) :
         VoiceModelError(VoiceErrorCategory.INCOMPLETE_CONFIG, "Voice pack is not installed: $packId")
 
     /**
-     * On-device recognition failed (corrupt files, out of memory, timeout, unsupported device, model released). The cause chain carries no provider error ([ModelError]):
-     * [VoiceFailover.canTryNext] checks the cause chain for ModelError first, and an on-device failure must not be treated as a network error.
+     * On-device recognition failed (corrupt files, out of memory, timeout, the device cannot run it, the model was released). The cause chain carries no provider error ([ModelError]):
+     * [VoiceFailover.canTryNext] looks at [ModelError] in the cause chain first, and an on-device failure must not be treated as a network error.
      */
     class OnDeviceFailed(detail: String, cause: Throwable? = null) :
         VoiceModelError(VoiceErrorCategory.SYSTEM_UNAVAILABLE, detail, cause?.takeUnless(::hasModelError))
@@ -101,7 +104,7 @@ sealed class VoiceModelError(
             else -> Protocol(VoiceErrorCategory.PROTOCOL_ERROR, detailOf(error), error)
         }
 
-        /** On-device recognition failure: missing files mean "Needs download", everything else means on-device is unavailable (both move to the next, see [VoiceFailover]). */
+        /** An on-device recognition failure: a missing file means "Needs download", everything else is on-device unavailability (both fall through to the next, see [VoiceFailover]). */
         fun from(error: OnDeviceSttException, packId: String): VoiceModelError = when (error.kind) {
             OnDeviceSttException.Kind.Missing -> PackMissing(packId)
             OnDeviceSttException.Kind.Corrupt,

@@ -4,6 +4,7 @@ import com.wangzan101.mika.core.run.Attendance
 import com.wangzan101.mika.core.run.ChannelPeer
 import com.wangzan101.mika.core.run.RunOrigin
 import com.wangzan101.mika.core.run.RunProvenance
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,7 +19,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.io.File
-import java.io.FileOutputStream
 
 /** Where a queued item comes from: the user explicitly chose "Queue", or a steer missed the current task's wrap-up and can only be scheduled for the next item. */
 enum class QueuedSource { Explicit, Fallback }
@@ -80,11 +80,8 @@ class FileFollowUpQueueStore(private val file: File) : FollowUpQueueStore {
                 )
             }.distinctBy { it.id }
         }.getOrElse {
-            // Keep the damaged file so the next write cannot clobber it; add a sequence number when the same millisecond repeats
-            var backup = File(file.parentFile, file.name + ".corrupt-" + System.currentTimeMillis())
-            var n = 1
-            while (backup.exists()) backup = File(file.parentFile, file.name + ".corrupt-" + System.currentTimeMillis() + "-" + n++)
-            runCatching { file.renameTo(backup) }
+            // Keep a corrupt file so the next write does not overwrite it; append a sequence number when the same millisecond repeats
+            runCatching { AtomicFiles.quarantine(file, AtomicFiles.Quarantine.RenameCorrupt) }
             emptyList()
         }
     }
@@ -110,10 +107,8 @@ class FileFollowUpQueueStore(private val file: File) : FollowUpQueueStore {
                 put("channelMessageId", q.channelMessageId)
             }
         }).toString()
-        val temp = File(file.parentFile, file.name + ".tmp")
-        FileOutputStream(temp).use { out -> out.write(json.toByteArray(Charsets.UTF_8)); out.fd.sync() }
-        if (!temp.renameTo(file)) {
-            temp.delete()
+        if (!AtomicFiles.write(file, json, durable = true, move = AtomicFiles.Move.Rename)) {
+            AtomicFiles.tempFor(file).delete()
             error("follow-up queue rename failed")
         }
     }

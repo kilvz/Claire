@@ -1,4 +1,4 @@
-package com.wangzan101.mika.core.chat
+package com.wangzan101.mika.core.agent
 
 /**
  * A video that Claire generated during one conversation turn and left in the workspace. The path is a sandbox path `/workspace/out/video/…`;

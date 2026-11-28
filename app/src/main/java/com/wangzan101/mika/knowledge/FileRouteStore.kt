@@ -12,10 +12,8 @@ import com.wangzan101.mika.core.assembly.knownTools
 import com.wangzan101.mika.core.assembly.legacyNames
 import com.wangzan101.mika.core.tool.ToolIndex
 import com.wangzan101.mika.core.tool.LegacyNames
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import java.io.File
-import java.io.FileOutputStream
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 /**
  * Routes are stored as `<dir>/<first package name>/<id>.json`; when there are more than [max] entries, the least recently used ones are deleted.
@@ -62,11 +60,9 @@ class FileRouteStore(
         require(r.steps.size <= MAX_ROUTE_STEPS && bytes.size <= MAX_ROUTE_BYTES) { "route ${r.id} too large" }
         val f = fileOf(r)
         f.parentFile?.mkdirs()
-        val tmp = File(f.parentFile, "${f.name}.tmp")
-        FileOutputStream(tmp).use { out -> out.write(bytes); out.fd.sync() }
-        // Atomic replace: the old file stays intact until the new file is in place
-        Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        // Same id but a different first package name: delete the copy at the old location
+        // Atomic replacement: the old file stays intact until the new one is in place
+        AtomicFiles.write(f, bytes, durable = true)
+        // The same id changed its first package name: delete the copy at the old location
         existing.filter { it.second.id == r.id && it.first.absoluteFile != f.absoluteFile }.forEach { it.first.delete() }
         val kept = existing.filter { it.second.id != r.id } + (f to r)
         kept.sortedBy { it.second.lastUsedMs }.take((kept.size - max).coerceAtLeast(0)).forEach { it.first.delete() }

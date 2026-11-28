@@ -124,7 +124,7 @@ fun VoiceServicesScreen(store: ProviderStore, onBack: () -> Unit, onOpenCustom: 
     fun apply(plan: VoicePresetPlan) {
         val manager = VoiceAccountManager(voiceModels.catalog, requireNotNull(voiceModels.credentialStore))
         saved = VoicePresets.apply(manager, voiceModels.catalog, plan).map(::encodeRef)
-        // The model list may differ under a new key, so it is fetched again when returning to the detail page
+        // The model list under a new key may differ, so refetch when returning to the detail page
         listedThisRun.remove(plan.service.id)
     }
     BackHandler(enabled = vendorForm != null || detail != null || preset != null || results != null) { back() }
@@ -139,7 +139,7 @@ fun VoiceServicesScreen(store: ProviderStore, onBack: () -> Unit, onOpenCustom: 
     NavSlide(currentPage, depth = { it.depth }, states = pageStates, pageKey = { it.key }) { page ->
         when (page) {
             is VoiceServicePage.Result -> PresetResult(snapshot, page.refs, viewModel, voiceModels, onDone = {
-                // After saving, return to this provider's details to see every model it brings
+                // After saving, return to this provider's detail to see all the models it brings
                 detail = page.refs.firstOrNull()?.serviceId ?: detail
                 saved = null; preset = null; vendorForm = null
             })
@@ -160,7 +160,7 @@ fun VoiceServicesScreen(store: ProviderStore, onBack: () -> Unit, onOpenCustom: 
     }
 }
 
-// The list must be storable in rememberSaveable, so a reference is encoded into one string
+// The list must survive rememberSaveable, so a reference is encoded as one line of text
 private fun encodeRef(ref: VoiceModelRef) = listOf(ref.serviceId, ref.modelId, ref.capability.name).joinToString("\u0001")
 private fun decodeRef(text: String): VoiceModelRef? = text.split("\u0001").takeIf { it.size == 3 }?.let { (s, m, c) ->
     runCatching { VoiceModelRef(s, m, VoiceCapability.valueOf(c)) }.getOrNull()
@@ -391,7 +391,7 @@ private fun VendorModelRow(
                     VoiceCapability.TTS -> selectReadAloud(voiceModels, voiceSettings, ref)
                     VoiceCapability.REALTIME -> voiceModels.realtime.select(ref)
                 }
-                // Models from the list and manually entered ones carry a borrowed protocol, so test once as soon as one is picked
+                // A fetched or typed-in model borrows its protocol, so test it once as soon as it is selected
                 if (model.origin != VoiceModelOrigin.Builtin) onTest(ref)
             },
             kind = ButtonKind.Tonal, size = ButtonSize.Small,
@@ -485,7 +485,7 @@ private fun VendorForm(vendor: VoiceVendor, onBack: () -> Unit, onSave: (VoicePr
                 } catch (e: VoiceModelError) {
                     error = e.detail
                 } catch (e: Exception) {
-                    // Checks in the storage layer fail (credentials, catalog unwritable, etc.) and throw something other than VoiceModelError: show it on the page the same way, do not let it escape
+                    // A storage-layer check that fails (credentials, the catalog cannot be written and the like) throws something other than VoiceModelError: show it on the page all the same, never let it escape
                     error = VoiceModelError.from(e).detail
                 }
             },
@@ -532,7 +532,7 @@ private fun PresetForm(kind: PresetKind, onBack: () -> Unit, onSave: (VoicePrese
                     InputRow(stringResource(R.string.voice_field_api_key), apiKey, { apiKey = it }, "sk-…", secret = true)
                     InputRow(stringResource(R.string.voice_field_name), name, { name = it }, optional)
                 }
-                // One group each for recognition, read-aloud and real-time speech, each with its own config; when a group's model is left empty, that item is not connected
+                // One group each for recognition, read-aloud and realtime voice, each holding its own configuration; a group with an empty model leaves that capability unwired
                 val modelLabel = stringResource(R.string.voice_model_id)
                 val voiceLabel = stringResource(R.string.voice_voice)
                 GroupLabel(stringResource(R.string.voice_cap_stt))
@@ -553,8 +553,17 @@ private fun PresetForm(kind: PresetKind, onBack: () -> Unit, onSave: (VoicePrese
             }
             PresetKind.SelfHosted -> {
                 GroupCard {
-                    InputRow(stringResource(R.string.voice_field_url), url, { url = it }, "192.168.1.5:10095", first = true, keyboard = KeyboardType.Uri)
-                    // Recognition language: "Auto" by default, unspecified and decided by the service itself; which languages the service can recognise depends on the model it runs
+                    InputRow(
+                        stringResource(R.string.voice_field_url),
+                        url,
+                        { url = it },
+                        stringResource(R.string.speech_funasr_enter_address),
+                        first = true,
+                        keyboard = KeyboardType.Uri,
+                        onClear = { url = "" },
+                        clearDescription = stringResource(R.string.clear),
+                    )
+                    // Recognition language: "Auto" by default, unspecified and left to the service; which languages it can recognize depends on the model it runs
                     AsrLanguageRow(AsrLanguage.of(language), { language = it.code })
                 }
             }
@@ -572,7 +581,7 @@ private fun PresetForm(kind: PresetKind, onBack: () -> Unit, onSave: (VoicePrese
                 } catch (e: VoiceModelError) {
                     error = e.detail
                 } catch (e: Exception) {
-                    // Checks in the storage layer fail (credentials, catalog unwritable, etc.) and throw something other than VoiceModelError: show it on the page the same way, do not let it escape
+                    // A storage-layer check that fails (credentials, the catalog cannot be written and the like) throws something other than VoiceModelError: show it on the page all the same, never let it escape
                     error = VoiceModelError.from(e).detail
                 }
             },
@@ -590,6 +599,7 @@ private fun PresetResult(
 ) {
     val c = MikaTheme.colors
     val probes by viewModel.probes.collectAsState()
+    val transcripts by viewModel.transcripts.collectAsState()
     val voiceSettings = VoiceSettings.get(LocalContext.current)
     val sample = stringResource(R.string.voice_try_sample)
     Page(stringResource(R.string.voice_result_title), onDone) {
@@ -597,45 +607,67 @@ private fun PresetResult(
         GroupCard {
             refs.forEachIndexed { index, ref ->
                 val model = snapshot.modelOf(ref) ?: return@forEachIndexed
-                val probe = viewModel.probeFingerprint(ref)?.let { probes[it] } ?: VoiceProbeUi.Idle
-                val stoppable = probe is VoiceProbeUi.Listening && viewModel.canStopStt(ref)
+                val fp = viewModel.probeFingerprint(ref)
+                val probe = fp?.let { probes[it] } ?: VoiceProbeUi.Idle
+                val transcript = fp?.let { transcripts[it] }.orEmpty()
                 val inUse = when (ref.capability) {
                     VoiceCapability.STT -> snapshot.selections.stt == SttSelection.Model(ref)
                     VoiceCapability.TTS -> snapshot.selections.tts == ref
                     VoiceCapability.REALTIME -> snapshot.selections.realtime == ref
                 }
                 ListRow(null, voiceModelDisplayName(model), capabilityLine(setOf(ref.capability)), first = index == 0) {
-                    MikaButton(
-                        stringResource(
-                            when {
-                                stoppable -> R.string.chat_stop
-                                ref.capability == VoiceCapability.STT -> R.string.voice_try_stt
-                                ref.capability == VoiceCapability.TTS -> R.string.voice_try_tts
-                                else -> R.string.voice_try_realtime
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (probe is VoiceProbeUi.Listening && probe.canFinish && !probe.converting) {
+                            MikaButton(
+                                stringResource(R.string.voice_result_done),
+                                onClick = { viewModel.finishStt(ref) },
+                                kind = ButtonKind.Primary,
+                                size = ButtonSize.Small,
+                            )
+                        }
+                        MikaButton(
+                            stringResource(
+                                if (probe.isActive) R.string.chat_audio_stop
+                                else when (ref.capability) {
+                                    VoiceCapability.STT -> R.string.voice_try_stt
+                                    VoiceCapability.TTS -> R.string.voice_try_tts
+                                    VoiceCapability.REALTIME -> R.string.voice_try_realtime
+                                },
+                            ),
+                            onClick = {
+                                if (probe.isActive) {
+                                    viewModel.stopProbe(ref)
+                                } else {
+                                    when (ref.capability) {
+                                        VoiceCapability.STT -> viewModel.verifyStt(ref)
+                                        VoiceCapability.TTS -> viewModel.verifyTts(ref, com.wangzan101.mika.core.model.TtsRequest(sample))
+                                        VoiceCapability.REALTIME -> viewModel.verifyRealtime(ref)
+                                    }
+                                }
                             },
-                        ),
-                        onClick = {
-                            when (ref.capability) {
-                                VoiceCapability.STT -> viewModel.verifyStt(ref)
-                                VoiceCapability.TTS -> viewModel.verifyTts(ref, com.wangzan101.mika.core.model.TtsRequest(sample))
-                                VoiceCapability.REALTIME -> viewModel.verifyRealtime(ref)
-                            }
-                        },
-                        kind = ButtonKind.Tonal, size = ButtonSize.Small,
-                        enabled = stoppable || (probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening),
-                    )
+                            kind = if (probe.isActive) ButtonKind.Secondary else ButtonKind.Tonal,
+                            size = ButtonSize.Small,
+                        )
+                    }
+                }
+                if (probe is VoiceProbeUi.Listening && !probe.converting) {
+                    androidx.compose.foundation.layout.Box(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 6.dp)) {
+                        VoiceWave(probe.level, flat = false, reduceMotion = MikaTheme.reduceMotion, color = c.accent)
+                    }
                 }
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val line = when (probe) {
                         VoiceProbeUi.Idle -> null
                         VoiceProbeUi.Running -> stringResource(R.string.voice_catalog_testing)
-                        is VoiceProbeUi.Listening -> probe.transcript.ifBlank { stringResource(R.string.voice_catalog_listening) }
-                        is VoiceProbeUi.Failed -> probe.error.detail
-                        is VoiceProbeUi.Verified -> probe.transcript.ifBlank { stringResource(R.string.voice_catalog_verified) }
+                        is VoiceProbeUi.Listening -> if (probe.converting) stringResource(R.string.voice_catalog_testing) else probe.transcript.ifBlank { stringResource(R.string.voice_catalog_listening) }
+                        VoiceProbeUi.Playing -> stringResource(R.string.voice_playing)
+                        is VoiceProbeUi.Failed -> voiceErrorText(probe.error)
+                        VoiceProbeUi.Verified -> if (transcript.isNotBlank()) "${stringResource(R.string.voice_catalog_verified)} · “$transcript”"
+                        else stringResource(R.string.voice_catalog_verified)
                     }
                     Text(
                         line.orEmpty(), Modifier.weight(1f).padding(top = 6.dp), style = MikaType.Hint,
-                        color = if (probe is VoiceProbeUi.Failed) c.bad else if (probe is VoiceProbeUi.Verified) c.ok else c.ink3,
+                        color = if (probe is VoiceProbeUi.Failed) c.bad else if (probe == VoiceProbeUi.Verified) c.ok else c.ink3,
                     )
                     MikaButton(
                         stringResource(

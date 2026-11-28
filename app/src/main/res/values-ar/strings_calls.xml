@@ -133,4 +133,12 @@
     <string name="calls_delete_digit">حذف</string>
     <string name="calls_clear_draft">مسح المسودة</string>
     <string name="calls_reset_history_filters">إعادة ضبط الفلاتر</string>
+    <string name="calls_default_greeting">مرحباً، أنا Claire، مساعد المكالمات بالذكاء الاصطناعي. هل هناك أي شيء تود أن أنقله؟</string>
+    <string name="calls_task_greeting">مرحباً، أنا Claire، مساعد المكالمات بالذكاء الاصطناعي. هل الوقت مناسب للتحدث الآن؟</string>
+    <string name="calls_closing_line">لقد أوشك وقتنا على الانتهاء، لنختتم المكالمة هنا. مع السلامة.</string>
+    <string name="calls_audio_probe_ready">مسار الصوت جاهز، لكن الصوت ثنائي الاتجاه لا يزال يحتاج إلى مكالمة اختبار فعلية</string>
+    <string name="calls_audio_probe_unavailable">تعذّر على المساعد المدمج اكتشاف صوت المكالمة</string>
+    <string name="calls_history_summary_updated">تم تحديث الملخص</string>
+    <string name="calls_voice_briefing_left_foreground">تمت مغادرة الواجهة، لم يتم إجراء المكالمة</string>
+    <string name="calls_voice_briefing_greeting">من فضلك أخبرني بالغرض من هذه المكالمة، أنا أستمع.</string>
 </resources>

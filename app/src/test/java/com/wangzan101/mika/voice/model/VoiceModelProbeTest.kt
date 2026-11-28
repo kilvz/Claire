@@ -5,14 +5,9 @@ import com.wangzan101.mika.core.model.TtsResponse
 import com.wangzan101.mika.voice.SpeechEvent
 import com.wangzan101.mika.voice.SpeechFailure
 import com.wangzan101.mika.voice.SpeechSession
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -28,31 +23,6 @@ private class FakeSpeechSession(flow: Flow<SpeechEvent>) : SpeechSession {
     override val live = true
     override fun release() { released = true }
     override fun cancel() {}
-}
-
-/** A live, unlimited session: it only finishes when released, like the streaming vendors. */
-private class LiveFakeSession : SpeechSession {
-    private val channel = Channel<SpeechEvent>(Channel.UNLIMITED)
-    override val events: Flow<SpeechEvent> = channel.receiveAsFlow()
-    override val live = true
-    override val unlimited = true
-    var released = false
-        private set
-
-    fun say(event: SpeechEvent) {
-        channel.trySend(event)
-    }
-
-    override fun release() {
-        if (released) return
-        released = true
-        channel.trySend(SpeechEvent.Final("hello"))
-        channel.close()
-    }
-
-    override fun cancel() {
-        channel.close()
-    }
 }
 
 class VoiceModelProbeTest {
@@ -132,26 +102,6 @@ class VoiceModelProbeTest {
 
         assertEquals(1, states.size)
         assertTrue(states.single() is VoiceProbeState.Failed)
-    }
-
-    @Test fun `stopping a live probe releases the session and verifies the transcript`() = runTest {
-        val session = LiveFakeSession()
-        val probe = probe(startStt = { session })
-        val stop = CompletableDeferred<Unit>()
-        val states = mutableListOf<VoiceProbeState>()
-
-        val job = launch { probe.verifyStt(ref, stop).toList(states) }
-        runCurrent()
-        session.say(SpeechEvent.Partial(stable = "hel", tail = "lo"))
-        runCurrent()
-        stop.complete(Unit)
-        job.join()
-
-        assertEquals(
-            listOf(VoiceProbeState.Transcribing("hello"), VoiceProbeState.Verified("hello")),
-            states,
-        )
-        assertTrue(session.released)
     }
 
     @Test fun `verifyTts returns the synthesized audio`() = runTest {

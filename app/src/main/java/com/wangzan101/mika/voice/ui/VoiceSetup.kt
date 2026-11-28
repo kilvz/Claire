@@ -1,5 +1,8 @@
 package com.wangzan101.mika.voice.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -42,6 +45,7 @@ import com.wangzan101.mika.ui.components.SheetTrailing
 import com.wangzan101.mika.ui.components.StatusPill
 import com.wangzan101.mika.ui.components.TagTone
 import com.wangzan101.mika.ui.theme.MikaIcons
+import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.voice.VoicePlayer
@@ -95,22 +99,24 @@ internal fun rememberVoiceCatalogViewModel(voiceModels: VoiceModelEnvironment): 
             probe = probe,
             scope = scope,
             playAudio = { bytes, mime -> player.play(bytes, mime) },
+            playAudioWithStatus = { bytes, mime, onStarted -> player.playAndAwait(bytes, mime, onStarted) },
+            onStopAudio = { player.stop() },
         )
     }
-    DisposableEffect(viewModel) { onDispose { player.stop() } }
+    DisposableEffect(viewModel) { onDispose { viewModel.stopAllProbes() } }
     return viewModel
 }
 
 /**
- * Switch to another read-aloud model. The voice returns to the new model's own default: the previous model's voice name most likely does not exist for the new model, and carrying it over would only make synthesis fail.
- * Choosing a read-aloud model during a call works the same way (see the call site of [com.wangzan101.mika.voice.model.VoiceCatalogStore.setPhoneVoice]).
- * Write the model first, and only after it succeeds clear the voice (the same order as [chooseSystemTtsEngine] when changing the system read-aloud engine).
- * Re-selecting the current model does not touch the voice. When old settings have not been migrated into the catalog yet (migration did not succeed) it is not touched either: read-aloud still uses the voice recorded in the old choice,
- * and the choice here has no effect on it.
+ * Switches the read-aloud model. The voice returns to the new model's own default: the previous model's voice name usually does not exist on the new one, and carrying it over only makes synthesis fail.
+ * Picking a read-aloud model in calls works the same way (see the callers of [com.wangzan101.mika.voice.model.VoiceCatalogStore.setPhoneVoice]).
+ * The model is written first and the voice cleared only once that succeeds (the same order as switching the system TTS engine in [chooseSystemTtsEngine]).
+ * Re-selecting the current model leaves the voice alone. When old settings have not been migrated into the catalog yet (migration failed) it is left alone too: read-aloud still uses the voice from the old choice then,
+ * and this choice has no effect on it.
  */
 internal fun selectReadAloud(voiceModels: VoiceModelEnvironment, settings: VoiceSettings, ref: VoiceModelRef) {
     val switching = voiceModels.tts.migrated && voiceModels.tts.current() != ref
-    // Switch the model first, and only after it succeeds clear the voice: when the catalog write fails (throws), model and voice both stay as they were
+    // Switch the model first and clear the voice only once that succeeds: if writing the catalog fails (throws), both the model and the voice stay as they were
     voiceModels.tts.select(ref)
     if (switching) settings.setVoice("")
 }
@@ -123,11 +129,11 @@ internal fun VoiceCatalogViewModel.ensureInCatalog(choice: VoiceOption): VoiceMo
 }
 
 /** Runs the capability's own test: a real sentence for speech input, a played sample for reading, a connection for calls. */
-internal fun VoiceCatalogViewModel.tryChoice(choice: VoiceOption, sample: String) {
+internal fun VoiceCatalogViewModel.tryChoice(choice: VoiceOption, sample: String, ttsRequest: TtsRequest = TtsRequest(sample)) {
     val ref = ensureInCatalog(choice)
     when (ref.capability) {
         VoiceCapability.STT -> verifyStt(ref)
-        VoiceCapability.TTS -> verifyTts(ref, TtsRequest(sample))
+        VoiceCapability.TTS -> verifyTts(ref, ttsRequest)
         VoiceCapability.REALTIME -> verifyRealtime(ref)
     }
 }
@@ -168,17 +174,18 @@ internal fun VoiceOptionList(
     onTest: (VoiceOption) -> Unit,
     pickable: (VoiceOption) -> Boolean = { true },
     extraTop: (@Composable () -> Unit)? = null,
-    /** Extra reminder badge under the name (such as "Needs download" for an on-device pack); null means none. */
+    /** An extra reminder badge under the name (such as "Needs download" for on-device packs); null means none. */
     badge: (VoiceOption) -> String? = { null },
 ) {
     val probes by viewModel.probes.collectAsState()
+    val transcripts by viewModel.transcripts.collectAsState()
     val c = MikaTheme.colors
     GroupCard {
         extraTop?.invoke()
         choices.forEachIndexed { index, choice ->
-            val probe = if (choice.offer == null) viewModel.probeFingerprint(choice.ref)?.let { probes[it] } ?: VoiceProbeUi.Idle
-            else VoiceProbeUi.Idle
-            val stoppable = probe is VoiceProbeUi.Listening && viewModel.canStopStt(choice.ref)
+            val fp = if (choice.offer == null) viewModel.probeFingerprint(choice.ref) else null
+            val probe = fp?.let { probes[it] } ?: VoiceProbeUi.Idle
+            val transcript = fp?.let { transcripts[it] }.orEmpty()
             RadioRow(
                 voiceModelDisplayName(choice.model),
                 selected = choice.ref == selected,
@@ -202,17 +209,47 @@ internal fun VoiceOptionList(
                         when (probe) {
                             VoiceProbeUi.Idle -> if (choice.verified) Text(stringResource(R.string.voice_catalog_verified), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ok)
                             VoiceProbeUi.Running -> Text(stringResource(R.string.voice_catalog_testing), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ink3)
-                            is VoiceProbeUi.Listening -> Text(probe.transcript.ifBlank { stringResource(R.string.voice_catalog_listening) }, Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ink2)
+                            is VoiceProbeUi.Listening -> if (probe.converting) {
+                                Text(stringResource(R.string.voice_catalog_testing), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ink3)
+                            } else {
+                                Row(
+                                    Modifier
+                                        .padding(top = 6.dp)
+                                        .background(c.fill, MikaShapes.Button)
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        VoiceWave(probe.level, flat = false, reduceMotion = MikaTheme.reduceMotion, color = c.accent)
+                                        Text(probe.transcript.ifBlank { stringResource(R.string.voice_catalog_listening) }, style = MikaType.Hint, color = c.ink2)
+                                    }
+                                    if (probe.canFinish) {
+                                        MikaButton(
+                                            stringResource(R.string.voice_result_done),
+                                            onClick = { viewModel.finishStt(choice.ref) },
+                                            kind = ButtonKind.Primary,
+                                            size = ButtonSize.Small,
+                                        )
+                                    }
+                                }
+                            }
+                            VoiceProbeUi.Playing -> Text(stringResource(R.string.voice_playing), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ink2)
                             is VoiceProbeUi.Failed -> Text(voiceErrorText(probe.error), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.bad)
-                            is VoiceProbeUi.Verified -> Text(stringResource(R.string.voice_catalog_verified), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ok)
+                            VoiceProbeUi.Verified -> {
+                                val label = if (transcript.isNotBlank()) "${stringResource(R.string.voice_catalog_verified)} · “$transcript”"
+                                else stringResource(R.string.voice_catalog_verified)
+                                Text(label, Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ok)
+                            }
                         }
                     }
                 },
                 trailing = {
                     MikaButton(
-                        if (stoppable) stringResource(R.string.chat_stop) else testLabel,
-                        onClick = { onTest(choice) }, kind = ButtonKind.Tonal, size = ButtonSize.Small,
-                        enabled = stoppable || (probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening),
+                        if (probe.isActive) stringResource(R.string.chat_audio_stop) else testLabel,
+                        onClick = { if (probe.isActive) viewModel.stopProbe(choice.ref) else onTest(choice) },
+                        kind = if (probe.isActive) ButtonKind.Secondary else ButtonKind.Tonal,
+                        size = ButtonSize.Small,
                         modifier = Modifier.testTag("voice-try-${choice.ref.serviceId}-${choice.ref.modelId}"),
                     )
                 },
@@ -234,6 +271,7 @@ internal fun VoicePickerSheet(
     onDismiss: () -> Unit,
     model: VoiceModel? = null,
     onAudition: ((String) -> Unit)? = null,
+    auditioningVoice: String? = null,
 ) {
     var typing by remember { mutableStateOf(false) }
     if (typing) {
@@ -246,23 +284,33 @@ internal fun VoicePickerSheet(
     val actions = listOf(SheetAction(stringResource(R.string.voice_voice_default), searchable = false) { onPick("") }) +
         voices.filter { it.isNotBlank() }.map { voice ->
             val label = VoiceVoices.label(model, voice)
-            SheetAction(label, trailing = onAudition?.let { play -> SheetTrailing(MikaIcons.Sound, stringResource(R.string.voice_audition, label)) { play(voice) } }) {
+            val playing = auditioningVoice == voice
+            SheetAction(
+                label,
+                trailing = onAudition?.let { play ->
+                    SheetTrailing(
+                        if (playing) MikaIcons.Stop else MikaIcons.Sound,
+                        if (playing) stringResource(R.string.chat_audio_stop) else stringResource(R.string.voice_audition, label),
+                    ) { play(voice) }
+                },
+            ) {
                 onPick(voice)
             }
         } +
         SheetAction(stringResource(R.string.voice_enter_voice_id), MikaIcons.Edit, searchable = false) { typing = true }
-    // When "Manual input" is chosen the sheet closes by itself; intercept it here so the input field can come up next
+    // Choosing "Enter manually" would also close the sheet; intercept that here so the input field can appear
     ActionSheet(stringResource(R.string.voice_voice), actions, searchHint = stringResource(R.string.search)) { if (!typing) onDismiss() }
 }
 
 /**
- * One line shown to the user when a test transcription fails: on-device pack failures become what to do (not installed is "Needs download", corrupt files are "Damaged, download again", the rest is "Try again"),
- * never exposing the English reason; everything else still shows the provider's own words.
+ * The one line shown to the user when a test turns fails: on-device pack failures are turned into what to do (not installed is "Needs download", corrupt files are "Corrupted, download again", everything else is "Please retry"),
+ * without exposing the English reason; others stay the vendor's own words.
  */
 @Composable
 internal fun voiceErrorText(error: VoiceModelError): String = when (error) {
     is VoiceModelError.PackMissing -> stringResource(R.string.voice_pack_needs_download)
     is VoiceModelError.OnDeviceFailed -> stringResource(onDeviceFailureText(error))
+    is VoiceModelError.NoSpeechDetected -> stringResource(R.string.voice_catalog_no_speech)
     else -> error.detail
 }
 
@@ -372,7 +420,7 @@ fun RealtimeVoiceScreen(store: ProviderStore, onBack: () -> Unit, onOpenCalls: (
                 choices, selected, stringResource(R.string.voice_try_realtime), viewModel,
                 onPick = { choice -> voiceModels.realtime.select(viewModel.ensureInCatalog(choice)) },
                 onTest = { choice -> viewModel.tryChoice(choice, "") },
-                // In-app voice calls can only take interruptible bidirectional protocols; phone-call-only models stay in the list as an explanation, and picking one goes to the AI phone calls page
+                // In-app voice calls only accept interruptible two-way protocols; phone-only models stay in the list with an explanation, and picking one goes to the AI calls page
                 pickable = { VoiceTrait.PhoneOnly !in it.traits },
             )
         }

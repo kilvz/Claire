@@ -78,8 +78,10 @@ internal suspend fun TaskRun.assemblePhone(a: RunAssembly): RunPhone {
                 withContext(Dispatchers.IO) { runCatching { AppCopyReader.read(s, launchableApps(service.packageManager, service.packageName)) }.getOrNull() }
             }.orEmpty()
         },
-        // shareWorkspaceAudio is always supplied to AndroidScreen above, so this capability check stays lazy.
+        // Shared audio, image and video files are always handed to AndroidScreen (see connectPhone), so report sharing as supported here instead of attaching the phone just to check capabilities
         canShareAudio = true,
+        canShareImage = true,
+        canShareVideo = true,
         calendarBulkWriter = { events ->
             withContext(Dispatchers.IO) { CalendarBulkWriter.insert(service, events) }
         },

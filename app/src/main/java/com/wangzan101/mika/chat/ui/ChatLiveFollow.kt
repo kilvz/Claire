@@ -119,7 +119,7 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
         }
     }
 
-    fun onAudios(audios: List<com.wangzan101.mika.core.chat.GeneratedAudio>) {
+    fun onAudios(audios: List<com.wangzan101.mika.core.agent.GeneratedAudio>) {
         if (liveIndex < 0) return
         _ui.update { ui ->
             val exchanges = ui.exchanges.toMutableList()
@@ -137,7 +137,7 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
         }
     }
 
-    fun onPhotos(photos: List<com.wangzan101.mika.core.chat.GeneratedPhoto>) {
+    fun onPhotos(photos: List<com.wangzan101.mika.core.agent.GeneratedPhoto>) {
         if (liveIndex < 0) return
         _ui.update { ui ->
             val exchanges = ui.exchanges.toMutableList()
@@ -146,7 +146,7 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
         }
     }
 
-    fun onVideos(videos: List<com.wangzan101.mika.core.chat.GeneratedVideo>) {
+    fun onVideos(videos: List<com.wangzan101.mika.core.agent.GeneratedVideo>) {
         if (liveIndex < 0) return
         _ui.update { ui ->
             val exchanges = ui.exchanges.toMutableList()
@@ -244,8 +244,10 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
      * The stored version of this conversation changed (a turn was saved from elsewhere, or one was edited): re-lay out the screen from the stored copy. Turns that were followed here are matched by run id
      * (by original message when there is no id), the copy from here (with steps and elapsed time) is used instead of duplicating them; turns not saved yet are appended; the followed pair stays last.
      */
-    fun syncSaved(conversationId: String) {
-        val stored = session.saved(conversationId)
+    fun syncSaved(conversationId: String) = syncSaved(conversationId, session.saved(conversationId))
+
+    /** [stored] is the entries saved for this conversation (may already be read in the background), merged with what is currently being followed on screen. */
+    fun syncSaved(conversationId: String, stored: List<Exchange>) {
         _ui.update { ui ->
             if (ui.conversationId != conversationId) return@update ui
             val live = ui.exchanges.getOrNull(liveIndex)

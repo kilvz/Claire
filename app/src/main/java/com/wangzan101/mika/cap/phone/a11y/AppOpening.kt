@@ -8,6 +8,7 @@ import com.wangzan101.mika.core.screen.uistate.ActionResult
 import com.wangzan101.mika.core.screen.uistate.AppWait
 import com.wangzan101.mika.core.screen.uistate.LaunchChooser
 import com.wangzan101.mika.cap.phone.shell.ShellService
+import com.wangzan101.mika.media.ShareableFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -118,59 +119,26 @@ internal class AppOpening(private val screen: AndroidScreen) {
     val canShareImage: Boolean get() = screen.shareImageFile != null
     val canShareVideo: Boolean get() = screen.shareVideoFile != null
 
-    /** The same open/reserve/wait flow as [shareText]; the audio is first turned into a content URI by [screen.shareAudioFile]. Only the share page is opened, nothing is sent. */
-    suspend fun shareAudio(packageName: String, path: String, text: String?): ActionResult = withContext(Dispatchers.IO) {
-        val share = screen.shareAudioFile?.invoke(path) ?: return@withContext ActionResult.Failed("unsupported")
-        if (screen.checkOtherTasks) {
-            val other = runCatching { screen.shell.displayOfPackage(packageName) }.getOrDefault(-1)
-            if (other >= 0 && other != screen.display.current?.displayId) return@withContext AndroidScreen.IN_USE_BY_OTHER
-            if (!screen.reserve(packageName)) return@withContext AndroidScreen.IN_USE_BY_OTHER
-        }
-        val before = if (screen.hasDisplay) screen.topWindowPackage().takeIf { it != screen.chooserPackage } else null
-        val id = screen.display.get().displayId
-        val startedAt = System.nanoTime()
-        screen.beforeOpen(packageName, null)
-        val code = runCatching { screen.shell.startShareFile(id, packageName, share.uri.toString(), share.mime, text.orEmpty()) }
-            .getOrDefault(ShellService.START_ERROR)
-        if (code != ShellService.START_OK) screen.notOpened(packageName, null)
-        when (code) {
-            ShellService.START_OK -> Unit
-            ShellService.START_IN_USE_ON_MAIN -> return@withContext ActionResult.Failed("app_in_use_by_user")
-            ShellService.START_IN_USE_BY_OTHER -> return@withContext AndroidScreen.IN_USE_BY_OTHER
-            ShellService.START_UNRESOLVED -> return@withContext ActionResult.Failed("cannot_share")
-            else -> return@withContext ActionResult.Failed("launch_failed")
-        }
-        awaitOpened(packageName, before, hint = null, sharing = true, launchedAt = startedAt)
-    }
+    /** Hands audio to the target app (see [shareFile]); audio first becomes a content URI via [AndroidScreen.shareAudioFile]. */
+    suspend fun shareAudio(packageName: String, path: String, text: String?): ActionResult =
+        shareFile(screen.shareAudioFile, packageName, path, text)
 
-    /** Same as [shareAudio], except the image is handed to the target app. */
-    suspend fun shareImage(packageName: String, path: String, text: String?): ActionResult = withContext(Dispatchers.IO) {
-        val share = screen.shareImageFile?.invoke(path) ?: return@withContext ActionResult.Failed("unsupported")
-        if (screen.checkOtherTasks) {
-            val other = runCatching { screen.shell.displayOfPackage(packageName) }.getOrDefault(-1)
-            if (other >= 0 && other != screen.display.current?.displayId) return@withContext AndroidScreen.IN_USE_BY_OTHER
-            if (!screen.reserve(packageName)) return@withContext AndroidScreen.IN_USE_BY_OTHER
-        }
-        val before = if (screen.hasDisplay) screen.topWindowPackage().takeIf { it != screen.chooserPackage } else null
-        val id = screen.display.get().displayId
-        val startedAt = System.nanoTime()
-        screen.beforeOpen(packageName, null)
-        val code = runCatching { screen.shell.startShareFile(id, packageName, share.uri.toString(), share.mime, text.orEmpty()) }
-            .getOrDefault(ShellService.START_ERROR)
-        if (code != ShellService.START_OK) screen.notOpened(packageName, null)
-        when (code) {
-            ShellService.START_OK -> Unit
-            ShellService.START_IN_USE_ON_MAIN -> return@withContext ActionResult.Failed("app_in_use_by_user")
-            ShellService.START_IN_USE_BY_OTHER -> return@withContext AndroidScreen.IN_USE_BY_OTHER
-            ShellService.START_UNRESOLVED -> return@withContext ActionResult.Failed("cannot_share")
-            else -> return@withContext ActionResult.Failed("launch_failed")
-        }
-        awaitOpened(packageName, before, hint = null, sharing = true, launchedAt = startedAt)
-    }
+    /** Same as [shareAudio], but hands an image to the target app. */
+    suspend fun shareImage(packageName: String, path: String, text: String?): ActionResult =
+        shareFile(screen.shareImageFile, packageName, path, text)
 
     /** Same as [shareAudio], but hands a video to the target app. */
-    suspend fun shareVideo(packageName: String, path: String, text: String?): ActionResult = withContext(Dispatchers.IO) {
-        val share = screen.shareVideoFile?.invoke(path) ?: return@withContext ActionResult.Failed("unsupported")
+    suspend fun shareVideo(packageName: String, path: String, text: String?): ActionResult =
+        shareFile(screen.shareVideoFile, packageName, path, text)
+
+    /** The same open/occupancy/wait flow as [shareText]; the file first becomes a content URI via [resolve] (null when the capability is absent). Only opens the share page, never sends. */
+    private suspend fun shareFile(
+        resolve: (suspend (path: String) -> ShareableFile?)?,
+        packageName: String,
+        path: String,
+        text: String?,
+    ): ActionResult = withContext(Dispatchers.IO) {
+        val share = resolve?.invoke(path) ?: return@withContext ActionResult.Failed("unsupported")
         if (screen.checkOtherTasks) {
             val other = runCatching { screen.shell.displayOfPackage(packageName) }.getOrDefault(-1)
             if (other >= 0 && other != screen.display.current?.displayId) return@withContext AndroidScreen.IN_USE_BY_OTHER

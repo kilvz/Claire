@@ -19,7 +19,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** Where the question got through: a notification was posted (also in the conversation), only the conversation was written (notification could not be posted), or nothing was delivered. */
+/** Where the question got through: a notification was posted (also in the conversation), only the conversation was written (the notification could not be posted), or nothing was delivered. */
 enum class OwnerReach { Notified, InConversation, Unreachable }
 
 /** Channel for asking the owner during a call: written into the conversation the call belongs to, plus a notification that can be answered directly. */
@@ -49,6 +49,7 @@ class PhoneDesk(
     private val context: (text: String) -> Boolean = { false },
     /** Whether this call's protocol can accept cues ([cue]); when it cannot, replies do not arrive by themselves and the model must ask again to collect them. See [canCue]. */
     private val canCue: Boolean = true,
+    private val languageTag: String? = null,
     private val unrelayed: (reply: String) -> Unit = {},
 ) {
     private val lock = Any()
@@ -107,19 +108,20 @@ class PhoneDesk(
         "or after a short while, then relay it in your own words."
 
     /** The current state of the task this call belongs to, as one line; null when there is no owning task. */
-    fun ownerTaskLine(): String? = renderOwnerTask(ownerTask()?.value)
+    fun ownerTaskLine(): String? = renderOwnerTask(ownerTask()?.value, languageTag)
 
     /**
      * Realtime call: the opening state is already in the prompt, so when the state changes afterwards (changes at the
-     * level of working → finished, not every step) push it as a background note without making the model speak for it.
+     * level of working > finished, not every step) push it as a background note without making the model speak for it.
      * Returns only when [close] is called.
      */
     suspend fun pushOwnerTaskChanges() {
         val flow = ownerTask() ?: return
+        val cueMark = cueMarkFor(languageTag)
         coroutineScope {
             val watcher = launch {
-                flow.map { renderOwnerTask(it) }.distinctUntilChanged().drop(1).collect { line ->
-                    if (line != null && !isClosed()) context(CUE_MARK + line)
+                flow.map { renderOwnerTask(it, languageTag) }.distinctUntilChanged().drop(1).collect { line ->
+                    if (line != null && !isClosed()) context(cueMark + line)
                 }
             }
             ended.await()
@@ -146,7 +148,7 @@ class PhoneDesk(
         if (attemptsLeft <= 0) return hold(reply)
         if (isClosed()) return unrelayed(reply)
         if (!canCue) return hold(reply)
-        val accepted = cue(replyCue(reply)) { spoken -> if (!spoken) relay(reply, attemptsLeft - 1) }
+        val accepted = cue(replyCue(reply, languageTag)) { spoken -> if (!spoken) relay(reply, attemptsLeft - 1) }
         // Protocol has no cue input: resending is pointless, so keep it for the next ask
         if (!accepted) hold(reply)
     }
@@ -176,13 +178,18 @@ class PhoneDesk(
         const val OWNER_TASK_PREFIX = "The task this call belongs to: "
         const val MAX_QUESTION_CHARS = 300
 
+        /** The cue prefix; the fork speaks English only, so the language tag is accepted for signature compatibility. */
+        fun cueMarkFor(@Suppress("UNUSED_PARAMETER") languageTag: String? = null): String = CUE_MARK
+
         /** The cue that hands the owner's reply to the model. */
-        fun replyCue(reply: String): String = CUE_MARK + "The owner has replied to your question: \"" + reply + "\". Briefly relay it to the other party in your own words."
+        fun replyCue(reply: String, @Suppress("UNUSED_PARAMETER") languageTag: String? = null): String =
+            CUE_MARK + "The owner has replied to your question: \"" + reply + "\". Briefly relay it to the other party in your own words."
 
         /** Trailing note for standard calls: reads [owner]'s current state before each model call, staying out of the system prompt (preserving the cached prefix). */
-        fun background(owner: StateFlow<TaskState>): DeskBackground = DeskBackground { renderOwnerTask(owner.value) }
+        fun background(owner: StateFlow<TaskState>, @Suppress("UNUSED_PARAMETER") languageTag: String? = null): DeskBackground =
+            DeskBackground { renderOwnerTask(owner.value) }
 
-        fun renderOwnerTask(state: TaskState?): String? = state?.let {
+        fun renderOwnerTask(state: TaskState?, @Suppress("UNUSED_PARAMETER") languageTag: String? = null): String? = state?.let {
             OWNER_TASK_PREFIX + when (deskPhaseOf(it)) {
                 DeskTaskPhase.Running -> "in progress"
                 DeskTaskPhase.Queued -> "queued"
@@ -197,7 +204,13 @@ class PhoneDesk(
          * The call's system prompt: the existing call prompt ([phonePrompt], including call rules and this task) first, then the front desk note.
          * [openingOwnerTask] is only given for realtime calls (the task state at opening); standard calls carry it in the trailing note, keeping the prompt byte-for-byte unchanged.
          */
-        fun systemPrompt(phonePrompt: String, task: CallTaskBrief?, openingOwnerTask: String?, canCue: Boolean = true): String {
+        fun systemPrompt(
+            phonePrompt: String,
+            task: CallTaskBrief?,
+            openingOwnerTask: String?,
+            canCue: Boolean = true,
+            @Suppress("UNUSED_PARAMETER") languageTag: String? = null,
+        ): String {
             val brief = buildString {
                 append(task?.let { "Goal: " + it.goal } ?: "No specific goal was given for this call.")
                 task?.questions?.takeIf { it.isNotEmpty() }?.let { append("\nRequired questions: ").append(it.joinToString(", ")) }
@@ -216,7 +229,7 @@ class PhoneDesk(
         fun canCue(standard: Boolean, protocol: CallVoiceProtocol): Boolean = standard || protocol == CallVoiceProtocol.OPENAI_REALTIME
 
         /** Calls that accept cues: replies arrive by themselves. */
-        const val RELAY_BY_CUE = "The owner's reply will arrive here as a note starting with \"[A note from Claire…]\": relay it to the other party in your own words; do not read the note out."
+        const val RELAY_BY_CUE = "The owner's reply will arrive here as a note starting with \"[A note from Claire...]\": relay it to the other party in your own words; do not read the note out."
 
         /** Calls that cannot accept cues: replies do not arrive by themselves, so ask again to collect them. */
         const val RELAY_BY_ASKING = "The owner's reply will NOT arrive here by itself: after asking, once the other party is waiting or after a short while, " +

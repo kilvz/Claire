@@ -2,15 +2,19 @@ package com.wangzan101.mika.cap.phone.shell
 
 import android.annotation.SuppressLint
 import android.app.ActivityOptions
+import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.UserHandle
 import android.os.UserManager
 import android.util.Log
+import android.view.Display
 import com.wangzan101.mika.core.screen.uistate.AppCopies
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.TAG
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.PER_USER_RANGE
@@ -21,46 +25,66 @@ import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.START_ERROR
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.START_OK_COLD_IGNORED
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.START_INVALID_LINK
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.START_IN_USE_BY_OTHER
+import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.START_UNRESOLVED
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.PROFILE_API_VISIBILITY_HIDDEN
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.TASK_INFO
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.USER_CURRENT
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.sameCopy
 
-// Assistant service: launching apps, app clones and multiple users, and Claire's own page
+// Assistant service: launching apps, links and sharing, system actions, app clones and multiple users, and Claire's own page
 /**
- * Launches [packageName] in the user copy [userId] (see [startApp]); occupancy is checked per copy only (package name
- * + user). When [userId] is Claire's own user, launch the original way (USER_CURRENT, the entry point the package
- * manager provides); for another user, first look up the launch entry in that user, then launch as that user, falling
- * back to `am start --user` when the interface is unavailable.
+ * Calls IActivityTaskManager.startActivityAsUser([ShellService.startActivityAsUser]) with shell's package name, carrying [options] (which display it lands on).
+ * True when the system accepted it (result >= 0); when refused, logs the result code ([what] says which launch) and returns false. Throws when the interface is unavailable, and the caller falls back to another route.
+ */
+internal fun ShellService.startAsShell(intent: Intent, resolvedType: String?, options: Bundle, userId: Int, what: String): Boolean {
+    // (caller, callingPackage, callingFeatureId, intent, resolvedType, resultTo, resultWho,
+    //  requestCode, flags, profilerInfo, options, userId)
+    val result = startActivityAsUser.invoke(
+        taskManager, null, ShellContext.SHELL_PACKAGE, null, intent, resolvedType, null, null,
+        0, 0, null, options, userId,
+    ) as Int
+    if (result < 0) Log.w(TAG, "startActivityAsUser($what) -> $result")
+    return result >= 0
+}
+
+/**
+ * Occupancy check before launching: [onMain] true (the user is using it on the main screen) -> [START_IN_USE_ON_MAIN]; [packages] on another of Claire's screens
+ * (only that user when [userId] is non-null) -> [START_IN_USE_BY_OTHER]; neither -> null.
+ * When task state cannot be read it is [START_ERROR]: better not to launch than to risk disturbing the user.
+ */
+internal inline fun ShellService.inUseCode(packages: Collection<String>, displayId: Int, userId: Int? = null, onMain: () -> Boolean): Int? = try {
+    when {
+        onMain() -> START_IN_USE_ON_MAIN
+        onOtherOwnDisplay(packages, displayId, userId) -> START_IN_USE_BY_OTHER
+        else -> null
+    }
+} catch (t: Throwable) {
+    Log.e(TAG, "cannot inspect main-screen tasks", t)
+    START_ERROR
+}
+
+/** Whether any of these packages that can take links or system actions has a task on the main screen (rules in [ShellLinks.inUse]). */
+internal fun ShellService.linkInUseOnMain(packages: List<String>): Boolean =
+    ShellLinks.inUse(packages, tasksOn(Display.DEFAULT_DISPLAY).flatMap(::packagesOf).toSet())
+
+/**
+ * Launches [packageName] in the user [userId] (see [startApp]); occupancy only looks at that copy (package name + user).
+ * When [userId] is Claire's own user it launches the old way (USER_CURRENT, the entry point from the package manager); for another user it first looks up that user's entry point,
+ * then launches as that user, falling back to `am start --user` when the interface is unavailable.
  */
 internal fun ShellService.start(displayId: Int, packageName: String, userId: Int): Int = synchronized(launchLock) {
     if (!ownDisplay(displayId)) return START_ERROR
-    try {
-        if (inUseOnMainScreen(packageName, userId)) return START_IN_USE_ON_MAIN
-        if (onOtherOwnDisplay(listOf(packageName), displayId, userId)) return START_IN_USE_BY_OTHER
-    } catch (t: Throwable) {
-        // When the main-screen state cannot be determined, better not to launch than to risk disturbing the user
-        Log.e(TAG, "cannot inspect main-screen tasks", t)
-        return START_ERROR
-    }
-    // The task left behind by the previous task is still behind the main display: move the whole thing back and continue on that page instead of opening a new one from scratch
+    inUseCode(listOf(packageName), displayId, userId) { inUseOnMainScreen(packageName, userId) }?.let { return it }
+    // A task left behind the main screen by the previous task is still there: bring the whole thing back and continue from that page instead of starting a new one from the beginning
     if (resumeKept(displayId, packageName, userId)) return START_OK
     val intent = launchIntent(packageName, userId) ?: return START_NOT_FOUND
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
-    // A copy in another user first tries the launcher-icon path: some systems show an "open with" chooser for a programmatic launch of another copy, while the launcher path does not
+    // For another user, try the launcher path first: some systems show a "open with" picker when another copy is launched by an app, while the launcher path does not
     val component = intent.component
     if (userId != myUser && component != null && startAsLauncher(component, userId, options)) return START_OK
     val ok = try {
-        val start = taskManager.javaClass.methods.first { it.name == "startActivityAsUser" && it.parameterTypes.size == 12 }
-        // (caller, callingPackage, callingFeatureId, intent, resolvedType, resultTo, resultWho,
-        //  requestCode, flags, profilerInfo, options, userId)
-        val result = start.invoke(
-            taskManager, null, ShellContext.SHELL_PACKAGE, null, intent, null, null, null,
-            0, 0, null, options, if (userId == myUser) USER_CURRENT else userId,
-        ) as Int
-        if (result < 0) Log.w(TAG, "startActivityAsUser($packageName, user $userId) -> $result")
-        result >= 0
+        startAsShell(intent, null, options, if (userId == myUser) USER_CURRENT else userId, "$packageName, user $userId")
     } catch (t: Throwable) {
         Log.w(TAG, "startActivityAsUser unavailable, falling back to am start", t)
         val component = intent.component?.flattenToShortString() ?: return START_NOT_FOUND
@@ -71,11 +95,9 @@ internal fun ShellService.start(displayId: Int, packageName: String, userId: Int
 }
 
 /**
- * Opens the launch page [component] in another user copy [userId] the way a launcher would:
- * ILauncherApps.startActivityAsUser (the interface behind LauncherApps.startMainActivity), with the same [options]
- * (launch onto Claire's display). The system checks whether the caller may touch that user: shell has cross-user
- * permission, and the package name matches its own uid. Returns false when the interface is missing or rejected
- * (throws), and the caller switches to startActivityAsUser.
+ * Opens the launch page [component] of another user [userId] the way a launcher would: ILauncherApps.startActivityAsUser (the interface behind
+ * LauncherApps.startMainActivity), with the same [options] (launching onto Claire's screen). The system checks the caller against that user: shell has cross-user permission,
+ * and the package name matches its own uid. Returns false when the interface is absent or refuses (throws), and the caller falls back to startActivityAsUser.
  */
 internal fun ShellService.startAsLauncher(component: ComponentName, userId: Int, options: Bundle): Boolean = try {
     val la = launcherApps ?: throw IllegalStateException("no launcherapps service")
@@ -92,9 +114,8 @@ internal fun ShellService.startAsLauncher(component: ComponentName, userId: Int,
 }
 
 /**
- * The intent used to open [packageName]: in Claire's own user it is the entry point the package manager provides; in
- * another user the launch page of that user copy is looked up (the hidden interface queryIntentActivitiesAsUser, or
- * else `cmd package query-activities --user`). Null when it cannot be found.
+ * The intent for opening [packageName]: in Claire's own user it is the entry point the package manager gives; in another user it looks up that user's launch page
+ * (the hidden queryIntentActivitiesAsUser, falling back to `cmd package query-activities --user`). null when none is found.
  */
 @SuppressLint("PrivateApi")
 internal fun ShellService.launchIntent(packageName: String, userId: Int): Intent? {
@@ -113,7 +134,7 @@ internal fun ShellService.launchIntent(packageName: String, userId: Int): Intent
     return Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(ComponentName(pkg, cls))
 }
 
-/** One of these packages has a task on another Claire display (not [displayId]): another task is using that app. When [userId] is non-null only that user copy is considered. */
+/** Whether any of these packages has a task on another of Claire's screens (not [displayId]): that is an app another task is using. Only that user is considered when [userId] is non-null. */
 internal fun ShellService.onOtherOwnDisplay(packages: Collection<String>, displayId: Int, userId: Int? = null): Boolean {
     val others = synchronized(displays) { displays.keys.toSet() } - displayId
     if (others.isEmpty()) return false
@@ -121,18 +142,18 @@ internal fun ShellService.onOtherOwnDisplay(packages: Collection<String>, displa
     return allTasks().any { t -> displayField.getInt(t) in others && packages.any { isCopy(t, it, userId) } }
 }
 
-/** Whether the task is the copy of [packageName] in user [userId] (rules in [sameCopy]). */
+/** Whether the task is the copy of [packageName] in the user [userId] (rules in [sameCopy]). */
 internal fun ShellService.isCopy(task: Any, packageName: String, userId: Int?): Boolean =
     sameCopy(packagesOf(task), runCatching { TASK_INFO.getField("userId").getInt(task) }.getOrNull(), packageName, userId)
 
-/** [restartApp] acting on the copy in user [userId]: only this copy's tasks are considered and only processes in this user are ended; another copy installed in a different user is left alone. */
+/** [restartApp] acts on the copy in the user [userId]: only that copy's tasks are considered and only that user's process is ended; a copy installed in another user is untouched. */
 internal fun ShellService.restart(displayId: Int, packageName: String, userId: Int): Int = synchronized(launchLock) {
-    // Never touch a display it did not create (including the main display), and never end the process first
+    // Never touch a screen we did not create (including the main screen), and never end its process first
     if (!ownDisplay(displayId)) return START_ERROR
     val decision = try {
-        // Another task is using it on another Claire display: never end its process
+        // Another task is using it on another of Claire's screens: never end its process
         if (onOtherOwnDisplay(listOf(packageName), displayId, userId)) return START_IN_USE_BY_OTHER
-        // Starting from scratch: the copy the previous task left behind the main display was left by Claire herself, so close it first; it is not user state
+        // Starting from scratch: the copy left behind the main screen by the previous task is Claire's own, so close it first; it does not count as the user's state
         dropKept(packageName, userId)
         val displayField = TASK_INFO.getField("displayId")
         val taskDisplays = allTasks().filter { isCopy(it, packageName, userId) }.map { displayField.getInt(it) }
@@ -154,10 +175,8 @@ internal fun ShellService.restart(displayId: Int, packageName: String, userId: I
 }
 
 /**
- * The users on this phone, read through Android's original UserInfo / UserProperties (hidden interfaces via
- * reflection): flags, type, profile group, whether running, quiet mode, whether media is shared with the current user,
- * and whether hidden from other apps. A null user list means it cannot be read; individually unreadable items are left
- * empty (counted as not satisfied, see [AppCopies]).
+ * The users of this phone, read from Android's own UserInfo / UserProperties (hidden interfaces by reflection): flags, type, profile group, whether running, quiet mode,
+ * whether media is shared with the current user, and whether hidden from other apps. null when the user list cannot be read; a field that cannot be read is left empty (counts as not satisfied, see [AppCopies]).
  */
 @SuppressLint("PrivateApi")
 internal fun ShellService.users(): List<AppCopies.User>? {
@@ -166,7 +185,7 @@ internal fun ShellService.users(): List<AppCopies.User>? {
     val list = (runCatching { um.javaClass.getMethod("getAliveUsers").invoke(um) }.getOrNull()
         ?: runCatching { um.javaClass.getMethod("getUsers").invoke(um) }.getOrNull()) as? List<*> ?: return null
     val info = Class.forName("android.content.pm.UserInfo")
-    // The names the system itself gives the flags (the same UserInfo.flagsToString dumpsys user uses, including vendor-defined flags); when reflection fails, read dumpsys user
+    // The names the system gives its own flags (the same UserInfo.flagsToString used by dumpsys user, including vendor flags); when reflection fails, read dumpsys user
     val flagsToString = runCatching { info.getMethod("flagsToString", Int::class.javaPrimitiveType) }.getOrNull()
     val dumped by lazy { sh("dumpsys", "user").takeIf { it.first == 0 }?.second?.let(AppCopies::parseDumpsys).orEmpty() }
     return list.filterNotNull().map { u ->
@@ -190,38 +209,30 @@ internal fun ShellService.users(): List<AppCopies.User>? {
             mediaShared = prop("isMediaSharedWithParent") as? Boolean,
             hidden = (prop("getProfileApiVisibility") as? Int)?.let { it == PROFILE_API_VISIBILITY_HIDDEN },
             flagNames = names,
-            // parentId in dumpsys is the profile group (written only when it is neither itself nor "not in a group"); include it when read
+            // parentId in dumpsys is the profile group (written only when not self and not "no group"); carry it when read
             parentId = group.takeIf { it != id && it != AppCopies.NO_PROFILE_GROUP } ?: if (flagsToString == null) dumped[id]?.parentId else null,
         )
     }
 }
 
-/** Splits the flagsToString result (such as "CLONED_PROFILE|FULL|INITIALIZED"; some versions add braces) into names. */
+/** Splits the result of flagsToString (such as "CLONED_PROFILE|FULL|INITIALIZED", with braces on some versions) into names. */
 internal fun ShellService.flagNames(s: String): List<String> = s.trim('{', '}', ' ').split('|', ' ', ',').map(String::trim).filter(String::isNotEmpty)
 
 /**
- * Opens Claire's compatibility self-check page ([SystemIntents.OWN_PAGE_CLASS]) on this display as shell, the same
- * path as [startApp] (startActivityAsUser with setLaunchDisplayId, falling back to `am start --display`). That page is
- * open only to callers holding INTERACT_ACROSS_USERS_FULL (shell has it, ordinary apps do not), and shell launches are
- * not restricted by background activity start limits. The package name must be Claire's own; no other component is
- * ever opened.
+ * Opens Claire's compatibility self-check page ([SystemIntents.OWN_PAGE_CLASS]) on this display as shell, by the same route as [startApp]
+ * (startActivityAsUser with setLaunchDisplayId, falling back to `am start --display`). That page is open only to callers holding INTERACT_ACROSS_USERS_FULL
+ * (shell has it, ordinary apps do not); shell launches are not subject to background-activity-start limits. The package name must be Claire's own; no other component is opened.
  */
 internal fun ShellService.startOwnPage(displayId: Int, intent: Intent): Int {
     val component = intent.component ?: return START_INVALID_LINK
     val mine = runCatching { context.packageManager.getPackagesForUid(allowedUid)?.toList() }.getOrNull().orEmpty()
-    // Only Claire can reach this service; check the package name once more (when Claire's package names cannot be queried, only the class name is checked)
+    // Only Claire can reach this service; check the package name again (when Claire's package name cannot be read, only the class name is trusted)
     if (component.className != SystemIntents.OWN_PAGE_CLASS || (mine.isNotEmpty() && component.packageName !in mine)) return START_INVALID_LINK
-    // Always open a fresh page: the old page and its task are cleared, so the new one is guaranteed to be on top of Claire's display
+    // Open a fresh page every time: the old page and its task are cleared, and the new one is always on top of Claire's screen
     val page = Intent().setComponent(component).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
     val ok = try {
-        val start = taskManager.javaClass.methods.first { it.name == "startActivityAsUser" && it.parameterTypes.size == 12 }
-        val result = start.invoke(
-            taskManager, null, ShellContext.SHELL_PACKAGE, null, page, null, null, null,
-            0, 0, null, options, USER_CURRENT,
-        ) as Int
-        if (result < 0) Log.w(TAG, "startActivityAsUser(own page) -> $result")
-        result >= 0
+        startAsShell(page, null, options, USER_CURRENT, "own page")
     } catch (t: Throwable) {
         Log.w(TAG, "startActivityAsUser unavailable, falling back to am start", t)
         exec("am", "start", "--display", "$displayId", "--activity-clear-task", "-n", component.flattenToShortString()) == 0
@@ -230,9 +241,8 @@ internal fun ShellService.startOwnPage(displayId: Int, intent: Intent): Int {
 }
 
 /**
- * The pages that can handle [intent], as (package name, fully qualified class name). When the system interface cannot
- * be used here, ask the system service instead (see [ActivityQuery]); null when neither works. [type] is the intent's
- * data type (it must be given separately on the command line).
+ * Pages that can take [intent], as (package name, fully qualified class name). When the system interface cannot look it up from this side it asks the system service (see [ActivityQuery]); null when neither works.
+ * [type] is the intent's data type (given separately on the command line).
  */
 internal fun ShellService.activitiesFor(intent: Intent, type: String?): List<Pair<String, String>>? = try {
     context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY).map { it.activityInfo.packageName to it.activityInfo.name }
@@ -245,4 +255,108 @@ internal fun ShellService.activitiesFor(intent: Intent, type: String?): List<Pai
 
 internal fun ShellService.packagesOf(task: Any): List<String> = listOf("baseActivity", "topActivity").mapNotNull {
     (TASK_INFO.getField(it).get(task) as? ComponentName)?.packageName
+}
+
+/** The implementation of [ShellService.startView]. */
+internal fun ShellService.launchView(displayId: Int, action: String?, uri: String?, packageName: String?): Int = synchronized(launchLock) {
+    if (!ownDisplay(displayId)) return START_ERROR
+    ShellLinks.refuse(action, uri, packageName)?.let { return it }
+    val intent = Intent(action ?: Intent.ACTION_VIEW).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    uri?.let { intent.data = Uri.parse(it) }
+    packageName?.let { intent.setPackage(it) }
+    // Web-style links go only to pages that declare they open from links; app-internal pages are not touched
+    if (action == null) intent.addCategory(Intent.CATEGORY_BROWSABLE)
+    val candidates = activitiesFor(intent, null) ?: return START_ERROR
+    if (candidates.isEmpty()) return START_UNRESOLVED
+    val handlers = candidates.map { it.first }.distinct()
+    inUseCode(handlers, displayId) { linkInUseOnMain(handlers) }?.let { return it }
+    candidates.singleOrNull()?.let { (pkg, cls) -> intent.component = ComponentName(pkg, cls) }
+    val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
+    val ok = try {
+        startAsShell(intent, null, options, USER_CURRENT, "link")
+    } catch (t: Throwable) {
+        Log.w(TAG, "startActivityAsUser unavailable, falling back to am start", t)
+        val target = intent.component?.let { listOf("-n", it.flattenToShortString()) }
+            ?: (listOf("-a", intent.action!!) + listOfNotNull(uri?.let { "-d" }, uri) + listOfNotNull(packageName?.let { "-p" }, packageName) +
+                (if (action == null) listOf("-c", Intent.CATEGORY_BROWSABLE) else emptyList()))
+        exec("am", "start", "--display", "$displayId", *target.toTypedArray()) == 0
+    }
+    if (ok) START_OK else START_ERROR
+}
+
+/** The implementation of [ShellService.startShare]. */
+internal fun ShellService.launchShare(displayId: Int, packageName: String, text: String): Int = synchronized(launchLock) {
+    if (!ownDisplay(displayId)) return START_ERROR
+    val intent = ShareIntent.of(packageName, text)
+    val candidates = activitiesFor(intent, ShareIntent.TYPE) ?: return START_ERROR
+    if (candidates.isEmpty()) return START_UNRESOLVED
+    inUseCode(listOf(packageName), displayId) { inUseOnMainScreen(packageName) }?.let { return it }
+    candidates.singleOrNull()?.let { (pkg, cls) -> intent.component = ComponentName(pkg, cls) }
+    val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
+    val ok = try {
+        startAsShell(intent, ShareIntent.TYPE, options, USER_CURRENT, "share")
+    } catch (t: Throwable) {
+        Log.w(TAG, "startActivityAsUser unavailable, falling back to am start", t)
+        exec(*ShareIntent.amArgs(displayId, packageName, text, intent.component?.flattenToShortString()).toTypedArray()) == 0
+    }
+    if (ok) START_OK else START_ERROR
+}
+
+/** The implementation of [ShellService.startShareFile]. */
+internal fun ShellService.launchShareFile(displayId: Int, packageName: String, uri: String, mime: String, text: String): Int = synchronized(launchLock) {
+    if (!ownDisplay(displayId)) return START_ERROR
+    val target = Uri.parse(uri)
+    val intent = ShareIntent.ofFile(packageName, target, mime, text)
+    val candidates = activitiesFor(intent, mime) ?: return START_ERROR
+    if (candidates.isEmpty()) return START_UNRESOLVED
+    inUseCode(listOf(packageName), displayId) { inUseOnMainScreen(packageName) }?.let { return it }
+    candidates.singleOrNull()?.let { (pkg, cls) -> intent.component = ComponentName(pkg, cls) }
+    val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
+    val ok = try {
+        startAsShell(intent, mime, options, USER_CURRENT, "share file")
+    } catch (t: Throwable) {
+        Log.w(TAG, "startActivityAsUser unavailable, falling back to am start", t)
+        exec(*ShareIntent.amArgsFile(displayId, packageName, target, mime, text, intent.component?.flattenToShortString()).toTypedArray()) == 0
+    }
+    if (ok) START_OK else START_ERROR
+}
+
+/** The implementation of [ShellService.startSystemAction]. */
+internal fun ShellService.launchSystemAction(displayId: Int, intent: Intent, asMika: PendingIntent?): Int = synchronized(launchLock) {
+    if (!ownDisplay(displayId)) return START_ERROR
+    // Claire's own compatibility self-check page: opened directly onto this display as shell
+    if (intent.component?.className == SystemIntents.OWN_PAGE_CLASS) return startOwnPage(displayId, intent)
+    if (!SystemIntents.allowed(intent.action, intent.dataString)) return START_INVALID_LINK
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    val candidates = activitiesFor(intent, intent.type) ?: return START_ERROR
+    if (candidates.isEmpty()) return START_UNRESOLVED
+    val handlers = candidates.map { it.first }.distinct()
+    inUseCode(handlers, displayId) { linkInUseOnMain(handlers) }?.let { return it }
+    val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId)
+    val asShell = try {
+        startAsShell(intent, intent.type, options.toBundle(), USER_CURRENT, "${intent.action}")
+    } catch (t: Throwable) {
+        Log.w(TAG, "startActivityAsUser(${intent.action}) refused as shell", t)
+        false
+    }
+    if (asShell) return START_OK
+    if (asMika == null) return START_ERROR
+    // Since Android 14 the sender of a PendingIntent must explicitly allow it to start activities from the background
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        // ALLOWED is deprecated on Android 16; ALLOW_ALWAYS keeps the background start permitted there.
+        @Suppress("DEPRECATION")
+        val startMode = if (Build.VERSION.SDK_INT >= 36) {
+            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+        } else {
+            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+        }
+        options.setPendingIntentBackgroundActivityStartMode(startMode)
+    }
+    return try {
+        asMika.send(context, 0, null, null, null, null, options.toBundle())
+        START_OK
+    } catch (t: Throwable) {
+        Log.w(TAG, "sending ${intent.action} as Claire failed", t)
+        START_ERROR
+    }
 }

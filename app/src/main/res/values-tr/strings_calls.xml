@@ -133,4 +133,12 @@
     <string name="calls_delete_digit">Sil</string>
     <string name="calls_clear_draft">Taslağı temizle</string>
     <string name="calls_reset_history_filters">Filtreleri sıfırla</string>
+    <string name="calls_default_greeting">Merhaba, ben yapay zeka telefon asistanı Claire. İletmemi istediğiniz bir şey var mı?</string>
+    <string name="calls_task_greeting">Merhaba, ben yapay zeka telefon asistanı Claire. Şimdi konuşmak için uygun bir zaman mı?</string>
+    <string name="calls_closing_line">Süremiz neredeyse doldu, burada bitirelim. Hoşça kalın.</string>
+    <string name="calls_audio_probe_ready">Ses yolu hazır ancak çift yönlü ses için yine de canlı bir test araması gerekiyor</string>
+    <string name="calls_audio_probe_unavailable">Yerleşik yardımcı arama sesini algılayamadı</string>
+    <string name="calls_history_summary_updated">Özet güncellendi</string>
+    <string name="calls_voice_briefing_left_foreground">Ön plandan ayrılındı, arama yapılmadı</string>
+    <string name="calls_voice_briefing_greeting">Lütfen bu aramanın ne için olduğunu anlatın, dinliyorum.</string>
 </resources>

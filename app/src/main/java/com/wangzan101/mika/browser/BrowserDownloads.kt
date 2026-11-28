@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Environment
 import android.webkit.URLUtil
 import com.wangzan101.mika.cap.web.WebTab
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -165,13 +166,8 @@ internal class DownloadIds(private val file: File, private val limit: Int = 200)
     private fun save() {
         runCatching {
             file.parentFile?.mkdirs()
-            // Write a temporary file first and then rename it, so being killed halfway cannot leave half a file
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(ids.joinToString("\n"))
-            if (!tmp.renameTo(file)) {
-                file.writeText(tmp.readText())
-                tmp.delete()
-            }
+            // Write a temp file first, then rename it, so a kill halfway through does not leave half a file
+            AtomicFiles.write(file, ids.joinToString("\n"), durable = false, move = AtomicFiles.Move.Rename, fallback = AtomicFiles.Fallback.WriteDirect)
         }
     }
 }

@@ -85,6 +85,8 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
     /** The top task on the main screen when the run starts; it is checked again at every stage, and stages where it changed are recorded. */
     private var mainBefore: Int? = null
     private val mainChanged = mutableListOf<String>()
+    /** The virtual display has no focus of its own: when the main screen is touched, report partial support for this known limitation. */
+    @Volatile private var focusShared = false
 
     private class Web(val host: WebHost, val pool: WebTabPool, val screen: WebScreen) {
         fun close() {
@@ -388,6 +390,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         val flags = runCatching { app.getSystemService(DisplayManager::class.java).getDisplay(d.displayId)?.flags }.getOrNull()
         val own = flags?.let { it and ownFocusFlag() != 0 }
         val detail = "created ${d.width}x${d.height}, own focus " + when (own) { true -> "yes"; false -> "no"; null -> "unknown" }
+        focusShared = Build.VERSION.SDK_INT < DeviceFacts.OWN_FOCUS_SDK || own == false
         return when {
             Build.VERSION.SDK_INT < DeviceFacts.OWN_FOCUS_SDK -> CheckOutcome.partial("$detail (own focus needs Android 14)", Advice.FocusShared)
             own == false -> CheckOutcome.partial(detail, Advice.FocusShared)
@@ -584,8 +587,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         val before = mainBefore ?: return CheckOutcome.fail("main screen was not readable at the start", Advice.Error)
         sampleMain(sh, "end")
         val who = if (withContext(Dispatchers.IO) { runCatching { sh.packageOfTask(before) }.getOrNull() } == app.packageName) "Claire" else "another app"
-        return if (mainChanged.isEmpty()) CheckOutcome.pass("top task unchanged ($who stayed on top)")
-        else CheckOutcome.fail("top task changed during: ${mainChanged.joinToString()}", Advice.MainScreenChanged)
+        return MainScreenOutcome.of(mainChanged.toList(), focusShared, who)
     }
 
     // ---------- 10 built-in browser ----------

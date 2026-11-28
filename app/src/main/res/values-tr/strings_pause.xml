@@ -39,4 +39,6 @@
     <string name="pause_channel_reply">Telefondaki Claire duraklatıldığı için bu görev başlamadı. Claire sürdürüldükten sonra tekrar gönderin.</string>
     <string name="plans_skipped_paused">Claire duraklatılmışken atlandı</string>
     <string name="workflow_stopped_paused">Claire duraklatıldığı için durdu</string>
+    <string name="channel_stop_reply">Bu sohbetteki %1$d görev durduruldu.</string>
+    <string name="channel_stop_none">Bu sohbette çalışan veya sırada bekleyen görev yok.</string>
 </resources>

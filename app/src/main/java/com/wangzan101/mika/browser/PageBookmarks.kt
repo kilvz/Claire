@@ -1,5 +1,6 @@
 package com.wangzan101.mika.browser
 
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -103,13 +104,8 @@ class PageBookmarks(dir: File, private val limit: Int = LIMIT, private val clock
         _entries.value = list
         file.parentFile?.mkdirs()
         val json = JsonArray(list.map { buildJsonObject { put("url", it.url); put("title", it.title); put("at", it.addedAtMs); put("edited", it.edited) } }).toString()
-        // Write a temporary file first and then rename it, so being killed halfway cannot leave half a file
-        val tmp = File(file.parentFile, "$FILE.tmp")
-        tmp.writeText(json)
-        if (!tmp.renameTo(file)) {
-            file.writeText(json)
-            tmp.delete()
-        }
+        // Write a temp file first, then rename it, so a kill halfway through does not leave half a file
+        AtomicFiles.write(file, json, durable = false, move = AtomicFiles.Move.Rename, fallback = AtomicFiles.Fallback.WriteDirect)
     }
 
     companion object {

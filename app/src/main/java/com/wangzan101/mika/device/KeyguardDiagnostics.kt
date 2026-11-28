@@ -18,6 +18,11 @@ internal object KeyguardDiagnostics {
     ): String = "window[index=$index,focused=$focused,password_nodes=$passwordNodes,digits=$digits," +
         "pad_keys=$padKeys,pin_layout=$pinLayout]"
 
+    /** Which list the credential page was read from, and the size of each list: distinguishes "the whole window list is empty", "wrong display id" and "active window is not SystemUI". */
+    fun source(source: String, displayIds: List<Int>, legacyWindows: Int, activeRootPackage: CharSequence?): String =
+        "keyguard_source[source=$source,display_ids=${displayIds.joinToString("/").ifEmpty { "none" }}," +
+            "legacy_windows=$legacyWindows,active_root=${activeRootPackage?.let(::name) ?: "none"}]"
+
     fun windowInfo(
         index: Int,
         type: Int,

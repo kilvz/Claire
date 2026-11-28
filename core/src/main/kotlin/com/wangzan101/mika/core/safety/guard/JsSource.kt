@@ -1,4 +1,4 @@
-package com.wangzan101.mika.core.script
+package com.wangzan101.mika.core.safety.guard
 
 /**
  * Lexical check of JS source written by the model or by site commands.

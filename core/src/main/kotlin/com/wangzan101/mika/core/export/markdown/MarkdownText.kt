@@ -4,13 +4,64 @@ import java.net.URLEncoder
 
 /** Escaping for Markdown export: ordinary text is treated as plain text; link destinations are handled separately. */
 internal object MarkdownText {
-    private val SPECIAL = setOf('\\', '`', '*', '_', '[', ']', '<', '>', '|', '#', '!')
+    private val SPECIAL = setOf('\\', '`', '*', '_', '[', ']', '<', '>', '|', '#', '!', '~')
 
-    /** Plain text such as user wording, titles and captions: escapes characters Markdown would interpret as structure or HTML. */
+    /**
+     * Plain text such as user wording, titles and captions: escapes characters Markdown would interpret as structure or HTML.
+     * Paired ~~ would be read as strikethrough, so the whole character set is escaped. Line starts have their own whole-line structure:
+     * -/+ starts a list, a run of =/- lifts the previous line into a setext heading, and a number followed by . or ) starts an ordered list, so the leading character is escaped too.
+     */
     fun plain(text: String): String = buildString(text.length) {
-        for (ch in text) {
+        var lineStart = true
+        var i = 0
+        while (i < text.length) {
+            val ch = text[i]
+            if (ch == '\n' || ch == '\r') {
+                append(ch)
+                i++
+                lineStart = true
+                continue
+            }
+            if (lineStart) {
+                lineStart = false
+                // CommonMark still opens a list/setext block with up to three
+                // leading spaces; four spaces are an indented code block, where
+                // escaping the marker would change the literal code text.
+                var marker = i
+                while (marker < text.length && marker - i < 4 && text[marker] == ' ') marker++
+                if (marker - i <= 3) {
+                    while (i < marker) { append(' '); i++ }
+                    if (i < text.length) {
+                        val markerChar = text[i]
+                        if (markerChar == '-' || markerChar == '+' || markerChar == '=') {
+                            append('\\')
+                            append(markerChar)
+                            i++
+                            continue
+                        }
+                        if (markerChar in '0'..'9') {
+                            var j = i
+                            while (j < text.length && text[j] in '0'..'9') j++
+                            if (j < text.length && (text[j] == '.' || text[j] == ')')) {
+                                append(text, i, j)
+                                append('\\')
+                                append(text[j])
+                                i = j + 1
+                                continue
+                            }
+                        }
+                        if (markerChar in SPECIAL) append('\\')
+                        append(markerChar)
+                        i++
+                        if (markerChar == '\n' || markerChar == '\r') lineStart = true
+                        continue
+                    }
+                    continue
+                }
+            }
             if (ch in SPECIAL) append('\\')
             append(ch)
+            i++
         }
     }
 

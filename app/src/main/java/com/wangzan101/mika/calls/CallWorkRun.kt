@@ -1,5 +1,6 @@
 package com.wangzan101.mika.calls
 
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
@@ -26,7 +27,6 @@ import com.wangzan101.mika.calls.CallRuntime.CallProblem
 import com.wangzan101.mika.calls.CallRuntime.MediaStage
 import com.wangzan101.mika.calls.CallRuntime.Work
 import com.wangzan101.mika.calls.CallRuntime.Companion.MAX_MEDIA_DIAGNOSTICS
-import com.wangzan101.mika.calls.CallRuntime.Companion.PHONE_DTMF_PROMPT
 import com.wangzan101.mika.calls.CallRuntime.Companion.FAREWELL_ENDING
 import com.wangzan101.mika.calls.CallRuntime.Companion.TOKEN
 
@@ -93,8 +93,9 @@ internal suspend fun CallRuntime.runWork(w: Work) {
         val helper = shell ?: throw CallProblem("Claire's built-in helper is not connected")
         val migrated = realtimeController.migrated
         val standard = standardCalls
-        // Standard call: the owning task's state is appended as a trailing note each turn for the phone front desk, keeping the system prompt byte-for-byte unchanged
-        val ownerBackground = w.ownerTask?.let(PhoneDesk::background)
+        // Standard calls: the owning task's state is sent to the phone front desk as a trailing note each turn, while the system prompt stays byte-for-byte unchanged
+        val languageTag = callLanguageTag()
+        val ownerBackground = w.ownerTask?.let { PhoneDesk.background(it, languageTag = languageTag) }
         val provider = if (standard) CascadeCallProvider(cascade, CallUse.Phone, background = ownerBackground,
             meter = w.ownerConversationId?.let(app.conversations::meter)) else if (migrated) {
             try {
@@ -131,10 +132,11 @@ internal suspend fun CallRuntime.runWork(w: Work) {
         validateTarget(w)
         // Existing call prompt first, phone front desk note after; realtime calls put the owning task's state at opening into the prompt, then push updates when it changes
         val systemPrompt = PhoneDesk.systemPrompt(
-            CallPolicy.prompt(w.config.systemPrompt, w.direction, ownerRules, task = w.task) + PHONE_DTMF_PROMPT,
+            CallPolicy.prompt(w.config.systemPrompt, w.direction, ownerRules, task = w.task, languageTag = languageTag) + CallRuntime.phoneDtmfPrompt(languageTag),
             task = w.task.takeIf { w.direction == CallDirection.OUTGOING },
-            openingOwnerTask = if (standard) null else PhoneDesk.renderOwnerTask(w.ownerTask?.value),
+            openingOwnerTask = if (standard) null else PhoneDesk.renderOwnerTask(w.ownerTask?.value, languageTag = languageTag),
             canCue = PhoneDesk.canCue(standard, profile.protocol),
+            languageTag = languageTag,
         )
         try {
             provider.validate(profile, systemPrompt, enablePhoneDtmf = true)
@@ -149,7 +151,7 @@ internal suspend fun CallRuntime.runWork(w: Work) {
                 validateSessionTarget(w, helper)
                 w.mediaStage = MediaStage.VOLC_CONNECT
                 val connected = withTimeoutOrNull(5_000L) {
-                    provider.connect(profile, credentials, systemPrompt, enablePhoneDtmf = true)
+                    provider.connect(profile, credentials, systemPrompt, enablePhoneDtmf = true, languageTag = languageTag)
                         .also { w.session = it } // Adopt before the timeout/cancellation boundary.
                 } ?: throw CallProblem("The realtime voice connection timed out; the AI did not take over")
                 if (!connected.setMuted(true)) throw CallProblem("The realtime voice service did not become ready")
@@ -322,13 +324,17 @@ internal suspend fun CallRuntime.runWork(w: Work) {
 /** Only a pending AI attempt or active call can hold a timed partial wake lock. */
 internal fun CallRuntime.acquireCallWakeLock(w: Work, timeoutMs: Long = CallStandbyPolicy.activeWakeBudgetMs(w.config.maxCallSeconds)) {
     releaseCallWakeLock(w)
-    runCatching {
-        val power = app.getSystemService(PowerManager::class.java) ?: return
-        val lock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Claire:ActiveCall")
-        lock.setReferenceCounted(false)
-        w.wakeLock = lock
-        lock.acquire(timeoutMs)
-    }.onFailure { debugMediaException(w, it) }
+    runCatching { w.wakeLock = app.timedPartialWakeLock("Claire:ActiveCall", timeoutMs) }
+        .onFailure { debugMediaException(w, it) }
+}
+
+/** A non-reference-counted CPU lock that releases itself after the timeout (without turning the screen on); null when there is no power service, and acquire failures still throw. */
+internal fun Context.timedPartialWakeLock(tag: String, timeoutMs: Long): PowerManager.WakeLock? {
+    val power = getSystemService(PowerManager::class.java) ?: return null
+    return power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, tag).apply {
+        setReferenceCounted(false)
+        acquire(timeoutMs)
+    }
 }
 
 internal fun CallRuntime.releaseCallWakeLock(w: Work) {

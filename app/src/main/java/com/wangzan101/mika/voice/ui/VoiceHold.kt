@@ -1,7 +1,6 @@
 package com.wangzan101.mika.voice.ui
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -86,7 +85,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.app.ActivityCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.tr
@@ -116,7 +114,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import com.wangzan101.mika.browser.ui.findActivity
 import com.wangzan101.mika.chat.ui.ChatCopy
 import com.wangzan101.mika.chat.ui.ComposerMode
 import com.wangzan101.mika.chat.ui.Spinner
@@ -297,17 +294,6 @@ internal object VoiceCopy {
     }
 }
 
-/** The mark that the recording permission was denied: when the system no longer shows a dialog (denied before, and it should not explain again), show the explanation instead, with a button straight to the app's permission page. */
-private object MicPermission {
-    private const val PREFS = "voice_input"
-    private const val DENIED = "mic_denied"
-
-    fun denied(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(DENIED, false)
-
-    fun record(context: Context, granted: Boolean) =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(DENIED, !granted).apply()
-}
-
 /**
  * UI state of one push-to-talk on the input bar: whether the finger is still down ([holding]), the engine label on the card, the sheet and the toast.
  * Starting the session, converting events and wrapping up are all delegated to [hold].
@@ -410,18 +396,15 @@ internal fun rememberVoiceHold(voice: VoiceSource?, onText: (String) -> Unit, on
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        MicPermission.record(context, granted)
+        MicDenial.InputBar.record(context, denied = !granted)
     }
     vh.haptic = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
     vh.canSend = onSend != null
     vh.ensureMic = {
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) true
         else {
-            // The permission is requested only on the first hold; if it was denied and the system no longer shows a dialog, switch to the explanation + a trip to the system settings
-            val activity = context.findActivity()
-            val blocked = MicPermission.denied(context) && activity != null &&
-                !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.RECORD_AUDIO)
-            if (blocked) vh.sheet = VoiceSheet.Permission else launcher.launch(Manifest.permission.RECORD_AUDIO)
+            // Ask for permission only on the first press-and-hold; once refused and the system stops prompting, explain and offer system settings instead
+            if (MicDenial.InputBar.blocked(context)) vh.sheet = VoiceSheet.Permission else launcher.launch(Manifest.permission.RECORD_AUDIO)
             false
         }
     }

@@ -125,13 +125,13 @@ data class Exchange(
     val skillNotes: List<SkillNote> = emptyList(),
     /** Files exported to "Downloads/Claire" in this turn, shown as file cards. */
     val files: List<SharedFile> = emptyList(),
-    /** Audio Claire generated and left in the workspace this turn, shown as audio cards. */
-    val audios: List<com.wangzan101.mika.core.chat.GeneratedAudio> = emptyList(),
-    /** Images Claire generated and left in the workspace this turn, shown as photo tiles. */
-    val photos: List<com.wangzan101.mika.core.chat.GeneratedPhoto> = emptyList(),
-    /** The video Claire generated in this turn and left in the workspace, shown as a video card. */
-    val videos: List<com.wangzan101.mika.core.chat.GeneratedVideo> = emptyList(),
-    /** The moment this app launch started following (milliseconds); 0 when unknown. */
+    /** Audio this turn generated and left in the workspace, shown as an audio card. */
+    val audios: List<com.wangzan101.mika.core.agent.GeneratedAudio> = emptyList(),
+    /** Images this turn generated and left in the workspace, shown as photo tiles. */
+    val photos: List<com.wangzan101.mika.core.agent.GeneratedPhoto> = emptyList(),
+    /** Video this turn generated and left in the workspace, shown as a video card. */
+    val videos: List<com.wangzan101.mika.core.agent.GeneratedVideo> = emptyList(),
+    /** When following started after this app launch (milliseconds); 0 when unknown. */
     val startedAt: Long = 0L,
     /** Elapsed time computed at the end; null when not finished or when the start time is unknown. */
     val elapsedMs: Long? = null,

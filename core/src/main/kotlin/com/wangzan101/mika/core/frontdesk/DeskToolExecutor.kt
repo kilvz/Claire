@@ -1,5 +1,6 @@
 package com.wangzan101.mika.core.frontdesk
 
+import com.wangzan101.mika.core.net.scalar
 import com.wangzan101.mika.core.agent.TaskState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -39,10 +40,10 @@ class DeskToolExecutor(
     }
 
     private suspend fun dispatch(args: JsonObject): JsonObject {
-        val fragment = args.string("words").orEmpty()
+        val fragment = args.scalar("words").orEmpty()
         val words = verifiedWords(args) ?: return wordsRejected()
-        val note = args.string("note").orEmpty()
-        val title = args.string("title")?.ifBlank { null } ?: fragment.take(DESK_LINE_MAX_CHARS)
+        val note = args.scalar("note").orEmpty()
+        val title = args.scalar("title")?.ifBlank { null } ?: fragment.take(DESK_LINE_MAX_CHARS)
         // Dedupe looks at which task the front desk means (the pick, note and title): one message can dispatch several tasks, each carrying the same whole sentence
         val asked = listOf(fragment.trim(), note.trim(), title.trim()).joinToString("\n")
         return dispatching.withLock {
@@ -116,20 +117,18 @@ class DeskToolExecutor(
     /** Stop a task: the id must have been dispatched and the words must be the user's from this turn (reports and task-board text cannot stop it). */
     private fun cancel(args: JsonObject): JsonObject {
         val id = knownTask(args) ?: return status("unknown_task")
-        args.string("words")?.takeIf { it.isNotBlank() }?.let(words::saidNow) ?: return wordsRejected()
+        args.scalar("words")?.takeIf { it.isNotBlank() }?.let(words::saidNow) ?: return wordsRejected()
         return accepted(tasks.cancel(id))
     }
 
-    private fun knownTask(args: JsonObject): String? = args.string("task_id")?.takeIf { ledger.get(it) != null }
+    private fun knownTask(args: JsonObject): String? = args.scalar("task_id")?.takeIf { ledger.get(it) != null }
 
     /** The whole verified sentence: whichever sentence the user said contains the front desk's passage is the one handed over. */
-    private fun verifiedWords(args: JsonObject): String? = args.string("words")?.takeIf { it.isNotBlank() }?.let(words::said)
+    private fun verifiedWords(args: JsonObject): String? = args.scalar("words")?.takeIf { it.isNotBlank() }?.let(words::said)
 
     private fun accepted(ok: Boolean) = status(if (ok) "ok" else "not_accepted")
 
     private fun wordsRejected() = buildJsonObject { put("status", "rejected"); put("reason", "words_not_verified") }
 
     private fun status(value: String) = buildJsonObject { put("status", value) }
-
-    private fun JsonObject.string(key: String): String? = (get(key) as? JsonPrimitive)?.contentOrNull
 }

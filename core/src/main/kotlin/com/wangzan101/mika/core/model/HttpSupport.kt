@@ -118,27 +118,21 @@ internal object HttpSupport {
                                 return
                             }
                             val source = it.body?.source() ?: throw ModelError.BadResponse("The streaming response is empty")
-                            val data = mutableListOf<String>()
+                            val framer = SseFramer()
                             var events = 0
                             /** Dispatch one event; returning true means the protocol level has reached its terminal state (e.g. [DONE]), the read loop ends there and no longer waits for the connection to close. */
-                            fun dispatch(): Boolean {
-                                if (data.isEmpty()) return false
+                            fun dispatch(event: String?): Boolean {
+                                if (event == null) return false
                                 events++
-                                val event = data.joinToString("\n")
                                 attempt?.packet(event)
-                                val terminal = onEvent(event)
-                                data.clear()
-                                return terminal
+                                return onEvent(event)
                             }
                             while (cont.isActive) {
                                 val line = source.readUtf8Line() ?: break
-                                when {
-                                    line.isEmpty() -> if (dispatch()) break
-                                    line.startsWith("data:") -> data += line.removePrefix("data:").removePrefix(" ")
-                                }
+                                if (dispatch(framer.feed(line))) break
                             }
                             if (cont.isActive) {
-                                dispatch()
+                                dispatch(framer.flush())
                                 val eventStream = it.header("Content-Type")?.contains("event-stream", ignoreCase = true) == true
                                 if (events == 0 && !eventStream) throw ModelError.BadResponse("The response is not streaming content (Content-Type: ${it.header("Content-Type").orEmpty()})")
                                 cont.resume(RawResponse(it.code, it.header("retry-after"), ""))

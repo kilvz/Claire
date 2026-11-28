@@ -39,4 +39,6 @@
     <string name="pause_channel_reply">O Claire está pausado no celular, então não começou esta tarefa. Envie de novo depois que o Claire for retomado.</string>
     <string name="plans_skipped_paused">Pulado enquanto o Claire estava pausado</string>
     <string name="workflow_stopped_paused">Parado porque o Claire foi pausado</string>
+    <string name="channel_stop_reply">%1$d tarefa(s) deste chat foram interrompidas.</string>
+    <string name="channel_stop_none">Não há tarefas em andamento ou na fila neste chat.</string>
 </resources>

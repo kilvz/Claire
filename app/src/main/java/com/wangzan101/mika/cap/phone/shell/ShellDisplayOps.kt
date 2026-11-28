@@ -17,7 +17,7 @@ internal fun ShellService.createVirtualDisplay(surface: Surface, width: Int, hei
     val flags = displayFlags(Build.VERSION.SDK_INT, trusted)
     val vd = displayManager.createVirtualDisplay("mika-agent", width, height, dpi, surface, flags)
     val id = vd.display.displayId
-    synchronized(displays) { displays[id] = vd; displayDpi[id] = dpi }
+    synchronized(displays) { displays[id] = vd }
     setFullscreenWindowingMode(id)
     ensureOrientationWatch()
     setImePolicy(id)

@@ -5,6 +5,7 @@ import com.wangzan101.mika.core.run.ChannelPeer
 import com.wangzan101.mika.core.run.RunPhase
 import com.wangzan101.mika.core.run.RunStore
 import com.wangzan101.mika.core.run.StoredRun
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -15,7 +16,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.io.File
-import java.io.FileOutputStream
 import android.util.Log
 
 /** Run ledger in the app's private directory; atomically replaced after every phase transition, so an abnormal restart never mistakes a half-written JSON file for records. */
@@ -43,7 +43,7 @@ class FileRunStateStore(private val file: File) : RunStore {
             }
         }.onFailure {
             Log.e("MikaRunStore", "run store could not be read; preserving damaged file", it)
-            file.keepCorruptCopy()
+            AtomicFiles.quarantine(file, AtomicFiles.Quarantine.CopyCorrupt)
             records.clear()
         }
     }
@@ -67,9 +67,7 @@ class FileRunStateStore(private val file: File) : RunStore {
             put("followUpId", r.followUpId)
             put("recordId", r.recordId)
         } }).toString()
-        val temp = File(file.parentFile, file.name + ".tmp")
-        FileOutputStream(temp).use { out -> out.write(json.toByteArray(Charsets.UTF_8)); out.fd.sync() }
-        check(temp.renameTo(file)) { "run store rename failed" }
+        check(AtomicFiles.write(file, json, durable = true, move = AtomicFiles.Move.Rename)) { "run store rename failed" }
         records[record.id] = record
     }
 

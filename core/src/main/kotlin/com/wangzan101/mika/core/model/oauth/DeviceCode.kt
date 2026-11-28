@@ -1,5 +1,6 @@
 package com.wangzan101.mika.core.model.oauth
 
+import com.wangzan101.mika.core.net.str
 import com.wangzan101.mika.core.model.HttpSupport
 import com.wangzan101.mika.core.model.ModelError
 import kotlinx.coroutines.CancellationException
@@ -224,5 +225,3 @@ private const val MAX_POLL_FAILURES = 3
 
 /** On device, wait this long before asking again. The default argument is a function reference so the compiler does not have to handle a suspend call inside a lambda. */
 internal suspend fun oauthSleep(ms: Long) = delay(ms)
-
-private fun JsonObject.str(k: String): String? = (this[k] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull

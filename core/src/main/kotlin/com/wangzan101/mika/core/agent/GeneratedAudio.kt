@@ -1,4 +1,4 @@
-package com.wangzan101.mika.core.chat
+package com.wangzan101.mika.core.agent
 
 /**
  * A piece of audio Claire generated and left in the workspace during one round of conversation. The path is a sandbox path `/workspace/out/audio/…`;

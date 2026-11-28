@@ -33,8 +33,9 @@ internal suspend fun CallRuntime.probeAudio(): Boolean {
     val ready = probe?.getBoolean("ready") == true
     if (epoch == probeEpoch) {
         audioReady = ready
-        audioDetail = if (ready) "The audio path is ready, but two-way audio still needs on-device verification"
-            else probe?.getString("reason")?.take(160)?.takeIf { it.isNotBlank() } ?: "The built-in helper cannot check call audio"
+        audioDetail = if (ready) app.getString(R.string.calls_audio_probe_ready)
+            else probe?.getString("reason")?.take(160)?.takeIf { it.isNotBlank() }
+                ?: app.getString(R.string.calls_audio_probe_unavailable)
         publish()
     }
     return ready
@@ -43,7 +44,8 @@ internal suspend fun CallRuntime.probeAudio(): Boolean {
 /** [pushOwnerTask]: in realtime calls, push a cue when the owning task's state changes (standard calls carry it in each turn's trailing note, so no push needed); [canCue]: see [PhoneDesk.canCue]. */
 internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: CallRealtimeSession, pushOwnerTask: Boolean = false,
                                          canCue: Boolean = true) {
-    val greeting = CallPolicy.spokenGreeting(w.config.greeting, hasTask = w.task != null)
+    val languageTag = callLanguageTag()
+    val greeting = CallPolicy.spokenGreeting(w.config.greeting, hasTask = w.task != null, languageTag = languageTag)
     val notification = app.getString(
         if (greeting.isBlank()) R.string.calls_notification_connected_waiting else R.string.calls_notification_connected,
     )
@@ -117,6 +119,7 @@ internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: 
         unrelayed = { reply -> scope.launch { appendTranscript(w.transcript, CallTranscriptLine.OWNER_UNRELAYED, reply) } },
         context = { text -> session.sendContext(text) },
         canCue = canCue,
+        languageTag = languageTag,
     )
     try {
         withTimeoutOrNull(remaining ?: Long.MAX_VALUE) {
@@ -128,7 +131,7 @@ internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: 
                         delay(closingAt)
                         if (work === w && w.stopReason.value == null && w.aiActive &&
                             !target.suppressed && sameActiveMuteTarget(w, target)) {
-                            runCatching { session.sendGreeting(CallPolicy.CLOSING_LINE) }
+                            runCatching { session.sendGreeting(CallPolicy.closingLine(languageTag)) }
                         }
                     }
                 }

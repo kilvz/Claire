@@ -2,12 +2,10 @@ package com.wangzan101.mika.voice.model
 
 import com.wangzan101.mika.core.model.TtsRequest
 import com.wangzan101.mika.core.model.TtsResponse
-import com.wangzan101.mika.voice.SpeechEngineSpec
 import com.wangzan101.mika.voice.SpeechEvent
 import com.wangzan101.mika.voice.SpeechFailure
 import com.wangzan101.mika.voice.SpeechSession
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -42,7 +40,9 @@ class VoiceModelProbe(
         return environment.accountResolver.configurationFingerprint(service, model)
     }
 
-    fun verifyStt(ref: VoiceModelRef, stop: CompletableDeferred<Unit>? = null): Flow<VoiceProbeState> = flow {
+    fun openSttSession(ref: VoiceModelRef): SpeechSession = startStt(ref)
+
+    fun verifyStt(ref: VoiceModelRef): Flow<VoiceProbeState> = flow {
         val session = try {
             startStt(ref)
         } catch (e: CancellationException) {
@@ -51,9 +51,6 @@ class VoiceModelProbe(
             emit(VoiceProbeState.Failed(VoiceModelError.from(e)))
             return@flow
         }
-        // A live, unlimited session (sherpa-onnx or a streaming vendor) only finishes when it is released.
-        // Completing [stop] is the caller's "I have finished speaking" signal; a batch session ignores it.
-        if (session.unlimited) stop?.invokeOnCompletion { session.release() }
         try {
             session.events.collect { event -> emit(event.toState()) }
         } finally {
@@ -76,7 +73,7 @@ class VoiceModelProbe(
     }
 }
 
-private fun SpeechFailure.toError(): VoiceModelError = when (this) {
+internal fun SpeechFailure.toError(): VoiceModelError = when (this) {
     is SpeechFailure.Provider -> VoiceModelError.from(error)
     SpeechFailure.NoPermission -> VoiceModelError.Protocol(
         VoiceErrorCategory.SYSTEM_UNAVAILABLE, "Microphone permission is missing",

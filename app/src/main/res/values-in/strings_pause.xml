@@ -39,4 +39,6 @@
     <string name="pause_channel_reply">Claire di ponsel sedang dijeda, jadi tugas ini tidak dimulai. Kirim lagi setelah Claire dilanjutkan.</string>
     <string name="plans_skipped_paused">Dilewati saat Claire dijeda</string>
     <string name="workflow_stopped_paused">Dihentikan karena Claire dijeda</string>
+    <string name="channel_stop_reply">%1$d tugas di chat ini dihentikan.</string>
+    <string name="channel_stop_none">Tidak ada tugas yang berjalan atau mengantre di chat ini.</string>
 </resources>

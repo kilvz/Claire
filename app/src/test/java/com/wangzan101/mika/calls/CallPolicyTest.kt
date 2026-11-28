@@ -185,4 +185,46 @@ class CallPolicyTest {
         assertNull(CallPolicy.closingDelayMs(10_000))
         assertEquals(5_000L, CallPolicy.closingDelayMs(CallPolicy.CLOSING_LEAD_MS + 5_000L))
     }
+
+    @Test fun promptIsEnglishOnlyForEveryLanguageTag() {
+        val cjk = Regex("[\\u3000-\\u30ff\\u3400-\\u9fff\\uff00-\\uffef]")
+        for (tag in listOf(null, "en", "zh-CN", "zh-Hans", "ja")) {
+            val prompt = CallPolicy.prompt("", CallDirection.OUTGOING, languageTag = tag)
+            assertTrue(prompt.contains("This is a live phone call"))
+            assertNull("$tag: $prompt", cjk.find(prompt))
+        }
+    }
+
+    @Test fun spokenGreetingFallsBackToEnglishConstants() {
+        val enGreeting = CallPolicy.spokenGreeting(CallPolicy.DEFAULT_GREETING, hasTask = true, languageTag = "en")
+        assertTrue(enGreeting.contains("Hello, this is Claire"))
+        val zhGreeting = CallPolicy.spokenGreeting(CallPolicy.DEFAULT_GREETING, hasTask = true, languageTag = "zh-CN")
+        assertEquals(CallPolicy.TASK_GREETING, zhGreeting)
+    }
+
+    @Test fun nonChinesePromptHasNoChineseOutsideUserText() {
+        val cjk = Regex("[\\u3000-\\u30ff\\u3400-\\u9fff\\uff00-\\uffef]")
+        val task = CallTaskBrief(goal = "预约周五晚上七点", questions = listOf("有没有包间"), context = "两位", constraints = "不付定金")
+        val userText = listOf(task.goal, task.questions.single(), task.context, task.constraints, "确认对方称呼。", "保存的规则")
+        listOf("en", "ja", "ko", "es", "pt", "ru", "ar", "fa", "id", "tr", "vi").forEach { tag ->
+            CallDirection.entries.forEach { direction ->
+                listOf(null, task).forEach { brief ->
+                    var prompt = CallPolicy.prompt("确认对方称呼。", direction, "保存的规则", brief, languageTag = tag) +
+                        CallRuntime.phoneDtmfPrompt(tag)
+                    userText.forEach { prompt = prompt.replace(it, "") }
+                    assertNull("$tag $direction ${brief != null}: $prompt", cjk.find(prompt))
+                }
+            }
+            assertNull(tag, cjk.find(VolcRealtimeProtocol.phoneTools(tag).toString()))
+        }
+    }
+
+    @Test fun allCallInstructionsAreEnglishEvenForChineseTags() {
+        assertTrue(CallRuntime.phoneDtmfPrompt(null).contains("When an automated phone menu asks for keypad input"))
+        assertTrue(CallRuntime.phoneDtmfPrompt("zh-Hans").contains("When an automated phone menu asks for keypad input"))
+        val cjk = Regex("[\\u3000-\\u30ff\\u3400-\\u9fff\\uff00-\\uffef]")
+        assertNull(cjk.find(VolcRealtimeProtocol.phoneTools("zh-Hant").toString()))
+        assertNull(cjk.find(VolcRealtimeProtocol.phoneTools().toString()))
+        assertFalse(CallPolicy.prompt("", CallDirection.OUTGOING, languageTag = "zh-Hans").contains("CRITICAL LANGUAGE RULE"))
+    }
 }

@@ -169,9 +169,9 @@ internal fun TaskService.withKeptState(t: Turn): Turn =
 
 /** Record a turn when the task ends so later messages can carry it as a reference. A write failure doesn't affect the task result. */
 internal fun TaskService.recordTurn(store: ConversationStore, run: TaskRun, end: TaskState, runId: String?, files: List<SharedFile> = emptyList(),
-    audios: List<com.wangzan101.mika.core.chat.GeneratedAudio> = emptyList(),
-    photos: List<com.wangzan101.mika.core.chat.GeneratedPhoto> = emptyList(),
-    videos: List<com.wangzan101.mika.core.chat.GeneratedVideo> = emptyList(),
+    audios: List<com.wangzan101.mika.core.agent.GeneratedAudio> = emptyList(),
+    photos: List<com.wangzan101.mika.core.agent.GeneratedPhoto> = emptyList(),
+    videos: List<com.wangzan101.mika.core.agent.GeneratedVideo> = emptyList(),
     steers: List<String> = emptyList(), groups: List<String> = emptyList(), interrupted: List<String> = emptyList(),
     finished: List<String> = emptyList()) {
     val goal = run.triggerCondition ?: run.goal
