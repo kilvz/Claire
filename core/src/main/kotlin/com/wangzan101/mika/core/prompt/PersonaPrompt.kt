@@ -31,9 +31,8 @@ object PersonaPrompt {
     /** Control characters that change the display direction: ALM, LRM, RLM, embeddings/overrides (U+202A–202E), isolates (U+2066–2069). */
     private val BIDI = Regex("[\\u061C\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069]")
 
-    /** Fixed sentences for the options: key -> raw text (`prompts/persona/style.md`, same format as the feedback files). Computed on every access, not cached — if the prompt language changes, the next lookup follows it. */
-    private val styleText: Map<String, String>
-        get() = Feedback.parse(Prompts.read("persona/style.md")).toMap()
+    /** Fixed sentences for the options: key -> raw text (`prompts/persona/style.md`, same format as the feedback files). Parsed once per process. */
+    private val styleText: Map<String, String> by lazy { Feedback.parse(Prompts.read("persona/style.md")).toMap() }
 
     /**
      * The assembled layer. The option sentences come first (one per line, prefixed with "- "), then the user-written body, separated by a blank
