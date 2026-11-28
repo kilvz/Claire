@@ -45,6 +45,7 @@ core/src/main/kotlin/com/wangzan101/mika/core/learn/skills/SkillDrafter.kt
 core/src/main/kotlin/com/wangzan101/mika/core/learn/skills/SkillOutcomes.kt
 core/src/main/kotlin/com/wangzan101/mika/core/learn/skills/SkillRedactor.kt
 core/src/main/kotlin/com/wangzan101/mika/core/run/record/Redactor.kt
+core/src/main/kotlin/com/wangzan101/mika/core/run/ChannelCommands.kt
 core/src/main/kotlin/com/wangzan101/mika/core/run/record/RunEvent.kt
 core/src/main/kotlin/com/wangzan101/mika/core/run/trace/TracePayload.kt
 core/src/main/kotlin/com/wangzan101/mika/core/agent/AgentLoop.kt

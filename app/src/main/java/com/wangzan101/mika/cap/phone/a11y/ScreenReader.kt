@@ -73,8 +73,7 @@ internal object ScreenReader {
             var clippedBounds = listOf(0, 0, 0, 0)
             if (visible) {
                 n.getBoundsInScreen(rect)
-                hash = mix(hash, n.className, n.text, n.contentDescription, rect.flattenToString(),
-                    states(n))
+                hash = mixNode(hash, n, rect)
                 if (n.isPassword) password = true
                 val own = if (n.isPassword) n.hintText?.toString()?.trim()?.ifEmpty { null } else ownLabel(n)
                 own?.let(texts::add)
@@ -202,15 +201,7 @@ internal object ScreenReader {
         return cls.endsWith("RecyclerView") || cls.endsWith("ListView") || cls.endsWith("GridView")
     }
 
-    private fun inList(n: AccessibilityNodeInfo): Boolean {
-        var p = n.parent
-        var depth = 0
-        while (p != null && depth++ < MAX_DEPTH) {
-            if (isList(p)) return true
-            p = p.parent
-        }
-        return false
-    }
+    private fun inList(n: AccessibilityNodeInfo): Boolean = n.ancestors(MAX_DEPTH).any(::isList)
 
     private fun clip(rect: Rect, width: Int, height: Int) {
         if (!rect.intersect(0, 0, width, height)) rect.setEmpty()
@@ -228,8 +219,7 @@ internal object ScreenReader {
             if (depth > MAX_DEPTH) return
             if (n.isVisibleToUser) {
                 n.getBoundsInScreen(rect)
-                hash = mix(hash, n.className, n.text, n.contentDescription, rect.flattenToString(),
-                    states(n))
+                hash = mixNode(hash, n, rect)
             }
             for (i in 0 until n.childCount) n.getChild(i)?.let { visit(it, depth + 1) }
         }
@@ -244,10 +234,27 @@ internal object ScreenReader {
         if (!n.isEnabled) add(UiStates.DISABLED)
     }
 
+    /**
+     * Mixes one visible node into the screen fingerprint: class name, text, description, on-screen position ([rect], just read by the caller) and control state.
+     * Position and state are mixed in as numbers, not spliced through strings; the fingerprint is only compared before and after within the same process, so changing the algorithm does not affect anything else.
+     */
     // isChecked was replaced by the tri-state checked in API 36; minSdk 29 still needs it
     @Suppress("DEPRECATION")
-    private fun states(n: AccessibilityNodeInfo) =
-        "${n.isChecked}${n.isSelected}${n.isEnabled}${n.isFocused}${n.textSelectionStart}:${n.textSelectionEnd}"
+    private fun mixNode(h0: Long, n: AccessibilityNodeInfo, rect: Rect): Long {
+        var h = mix(h0, n.className)
+        h = mix(h, n.text)
+        h = mix(h, n.contentDescription)
+        h = mixInt(h, rect.left)
+        h = mixInt(h, rect.top)
+        h = mixInt(h, rect.right)
+        h = mixInt(h, rect.bottom)
+        h = mixBool(h, n.isChecked)
+        h = mixBool(h, n.isSelected)
+        h = mixBool(h, n.isEnabled)
+        h = mixBool(h, n.isFocused)
+        h = mixInt(h, n.textSelectionStart)
+        return mixInt(h, n.textSelectionEnd)
+    }
 
     /** The node's own name: its text (hint text counts too; input fields use it to state their purpose), falling back to the content description. */
     fun ownLabel(n: AccessibilityNodeInfo): String? {
@@ -330,13 +337,23 @@ internal object ScreenReader {
     private const val FNV_OFFSET = -0x340d631b7bdddcdbL
     private const val FNV_PRIME = 0x100000001b3L
 
-    private fun mix(h0: Long, vararg parts: Any?): Long {
+    // Mix a separator value after each segment so adjacent segments shifting position do not hash the same
+    private fun end(h: Long) = (h xor 0x1f) * FNV_PRIME
+
+    /** Mix in text character by character; null and the empty string are kept distinct. */
+    private fun mix(h0: Long, s: CharSequence?): Long {
+        if (s == null) return end(h0 * FNV_PRIME) // Same as mixing in one 0 character
         var h = h0
-        for (p in parts) {
-            val s = p?.toString() ?: "\u0000"
-            for (c in s) h = (h xor c.code.toLong()) * FNV_PRIME
-            h = (h xor 0x1f) * FNV_PRIME
-        }
-        return h
+        for (i in 0 until s.length) h = (h xor s[i].code.toLong()) * FNV_PRIME
+        return end(h)
     }
+
+    /** Mix in an integer as 4 bytes. */
+    private fun mixInt(h0: Long, v: Int): Long {
+        var h = h0
+        for (shift in 0 until 32 step 8) h = (h xor ((v ushr shift) and 0xff).toLong()) * FNV_PRIME
+        return end(h)
+    }
+
+    private fun mixBool(h: Long, b: Boolean) = end((h xor if (b) 1L else 2L) * FNV_PRIME)
 }

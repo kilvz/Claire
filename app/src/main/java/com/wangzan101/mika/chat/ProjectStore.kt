@@ -1,6 +1,7 @@
 package com.wangzan101.mika.chat
 
 import android.content.Context
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -11,8 +12,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 /**
@@ -97,16 +96,7 @@ class ProjectStore(
     private fun save(list: List<Project>) {
         dir.mkdirs()
         val text = json.encodeToString(ProjectFile(projects = list))
-        val tmp = File(dir, "${file.name}.tmp")
-        tmp.writeText(text)
-        try {
-            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        } catch (_: Exception) {
-            if (!tmp.renameTo(file)) {
-                file.writeText(text)
-                tmp.delete()
-            }
-        }
+        AtomicFiles.write(file, text, durable = false, move = AtomicFiles.Move.AtomicThenRename, fallback = AtomicFiles.Fallback.WriteDirect)
         _projects.value = list
     }
 
@@ -118,8 +108,8 @@ class ProjectStore(
                 .filter { isValidId(it.id) && it.name.isNotBlank() }
                 .distinctBy { it.id }
         }.getOrElse {
-            // Keep the unreadable old file so the next save does not simply overwrite it
-            runCatching { file.renameTo(File(dir, "${file.name}.bad-${clock()}")) }
+            // Keep an old file that cannot be parsed, so the next save does not overwrite it
+            runCatching { AtomicFiles.quarantine(file, AtomicFiles.Quarantine.RenameBad, now = clock(), dedupe = false) }
             emptyList()
         }
     }

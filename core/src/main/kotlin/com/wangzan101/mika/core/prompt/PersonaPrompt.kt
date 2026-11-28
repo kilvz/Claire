@@ -1,6 +1,6 @@
 package com.wangzan101.mika.core.prompt
 
-import com.wangzan101.mika.core.agent.TokenEstimate
+import com.wangzan101.mika.core.model.TokenEstimate
 
 /**
  * The persona prompt layer: the fixed sentences corresponding to the UI options ([PersonaStyle]) plus a block of body text written by the

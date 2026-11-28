@@ -133,4 +133,12 @@
     <string name="calls_delete_digit">Borrar</string>
     <string name="calls_clear_draft">Borrar borrador</string>
     <string name="calls_reset_history_filters">Restablecer filtros</string>
+    <string name="calls_default_greeting">Hola, soy Claire, asistente telefónico de IA. ¿Hay algo que quieras que transmita?</string>
+    <string name="calls_task_greeting">Hola, soy Claire, asistente telefónico de IA. ¿Es un buen momento para hablar ahora?</string>
+    <string name="calls_closing_line">Se nos acaba el tiempo, así que lo dejamos aquí. Adiós.</string>
+    <string name="calls_audio_probe_ready">La ruta de audio está lista, pero el audio bidireccional aún requiere una llamada de prueba</string>
+    <string name="calls_audio_probe_unavailable">El asistente integrado no pudo detectar el audio de la llamada</string>
+    <string name="calls_history_summary_updated">Resumen actualizado</string>
+    <string name="calls_voice_briefing_left_foreground">Saliste de la pantalla, llamada no realizada</string>
+    <string name="calls_voice_briefing_greeting">Cuéntame para qué es esta llamada, te escucho.</string>
 </resources>

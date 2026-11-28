@@ -1,25 +1,13 @@
 package com.wangzan101.mika.cap.phone.a11y
 
-import android.accounts.AccountManager
-import android.app.AlarmManager
-import android.app.PendingIntent
-import android.content.ComponentName
 import android.content.Intent
-import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
-import android.content.res.Resources
-import android.graphics.Path
 import android.graphics.Rect
-import android.os.Bundle
 import android.os.SystemClock
-import android.util.Log
-import android.view.Display
 import android.view.KeyEvent
-import android.view.ViewConfiguration
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.view.accessibility.AccessibilityWindowInfo
 import com.wangzan101.mika.core.cap.phone.GesturePacing
 import com.wangzan101.mika.core.cap.phone.TypingPacing
 import com.wangzan101.mika.core.screen.uistate.ActionResult
@@ -31,12 +19,7 @@ import com.wangzan101.mika.core.screen.uistate.AppProfiles
 import com.wangzan101.mika.core.screen.uistate.LaunchChoice
 import com.wangzan101.mika.core.screen.uistate.LaunchChooser
 import com.wangzan101.mika.core.screen.uistate.OpenedElsewhere
-import com.wangzan101.mika.core.screen.uistate.UnseenField
-import com.wangzan101.mika.core.screen.uistate.normalize
-import com.wangzan101.mika.core.screen.uistate.Relocation
 import com.wangzan101.mika.core.screen.uistate.ScreenCheck
-import com.wangzan101.mika.core.screen.uistate.ScreenDiagnosis
-import com.wangzan101.mika.core.screen.uistate.ScreenFacts
 import com.wangzan101.mika.core.screen.uistate.ScreenPort
 import com.wangzan101.mika.core.screen.uistate.ScreenEvent
 import com.wangzan101.mika.core.screen.uistate.ScreenSnapshot
@@ -45,51 +28,29 @@ import com.wangzan101.mika.core.screen.uistate.SystemCommandResult
 import com.wangzan101.mika.core.screen.uistate.SystemAction
 import com.wangzan101.mika.core.screen.uistate.SystemActionResult
 import com.wangzan101.mika.core.screen.uistate.WheelOutcome
-import com.wangzan101.mika.cap.phone.shell.AsciiTextKeys
-import com.wangzan101.mika.cap.phone.shell.SystemIntents
 import com.wangzan101.mika.core.screen.visual.FrameGrid
 import com.wangzan101.mika.core.screen.uistate.Verification
-import com.wangzan101.mika.core.screen.uistate.TextField
-import com.wangzan101.mika.core.screen.uistate.typeAndVerify
-import com.wangzan101.mika.core.screen.uistate.relocate
-import com.wangzan101.mika.core.screen.uistate.RELOCATE_MAX_SHIFT
-import com.wangzan101.mika.core.screen.uistate.BackAffordance
 import com.wangzan101.mika.cap.phone.display.FrameMath
 import com.wangzan101.mika.cap.phone.display.LazyAgentDisplay
 import com.wangzan101.mika.shell.IMikaShell
-import com.wangzan101.mika.cap.phone.shell.MainScreenWatch
-import com.wangzan101.mika.cap.phone.shell.ShellService
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 /**
  * Android implementation of [ScreenPort]: reads the accessibility windows of the Agent's virtual display and operates on that screen.
@@ -265,87 +226,10 @@ class AndroidScreen(
     override val canShareVideo: Boolean get() = opening.canShareVideo
     suspend fun openOwnPage(intent: Intent): ActionResult = opening.openOwnPage(intent)
 
-    /**
-     * Opens a link or a settings page. Like [openApp], the display is created only on first use; if the user is using that app on the main screen, it is not opened.
-     * A settings page is expected to land in the package that hosts system settings, and an app-specific one in that app; landing elsewhere (a system chooser, a redirect page) still succeeds, with a hint.
-     */
-    override suspend fun openLink(action: String?, uri: String?, packageName: String?): ActionResult = withContext(Dispatchers.IO) {
-        // When an app is specified, the app-access boundary has already checked it; when not, pick a handler that is not blocked here if the deny list is non-empty
-        val pinned = packageName ?: allowedLinkHandler(action, uri)
-        val id = display.get().displayId
-        val expected = pinned ?: settingsPackage.takeIf { action != null }
-        if (checkOtherTasks && expected != null && !reserve(expected)) return@withContext IN_USE_BY_OTHER
-        val before = ScreenReader.topPackage(windows())
-        val beforeTree = treeHash()
-        val startedAt = System.nanoTime()
-        // When the opener is known in advance (app specified, settings page, or a link only one app handles): mute audio before launching
-        val early = expected ?: linkHandler(action, uri)
-        early?.let { beforeOpen(it, null) }
-        val code = shell.startView(id, action, uri, pinned)
-        if (code != ShellService.START_OK) early?.let { notOpened(it, null) }
-        when (code) {
-            ShellService.START_OK -> Unit
-            ShellService.START_IN_USE_ON_MAIN -> return@withContext ActionResult.Failed("app_in_use_by_user")
-            ShellService.START_IN_USE_BY_OTHER -> return@withContext IN_USE_BY_OTHER
-            ShellService.START_UNRESOLVED -> return@withContext ActionResult.Failed("link_unresolved")
-            ShellService.START_INVALID_LINK -> return@withContext ActionResult.Failed("invalid_link")
-            else -> return@withContext ActionResult.Failed("launch_failed")
-        }
-        // A link may land in another app, the system chooser, or a new page of the same app, so the pre-launch frame must not be served either.
-        frameGuardSince = startedAt
-        fun landed(): Boolean {
-            val top = ScreenReader.topPackage(windows())
-            return if (expected != null) top == expected else top != null && (top != before || treeHash() != beforeTree)
-        }
-        val deadline = SystemClock.uptimeMillis() + LAUNCH_WAIT_MS
-        while (!landed() && SystemClock.uptimeMillis() < deadline) delay(POLL_MS)
-        waitStable(SETTLE_CAP_MS)
-        val top = ScreenReader.topPackage(windows())
-        val changed = top != before || treeHash() != beforeTree
-        if (changed) awaitFrameAfter(startedAt) else frameGuardSince = null
-        // Only accept the app that actually opened the link: if it landed in the system chooser or elsewhere, do not treat that as the target
-        val opened = top?.takeIf { if (expected != null) it == expected else it !in systemPickers }
-        if (opened != null) {
-            // For a link whose opener was not known in advance, reserve after it lands; if the reservation fails, do not undo (the shell side already checked other screens)
-            if (checkOtherTasks) reserve(opened)
-            targetPackage = opened
-            requestedUser = null
-            val task = shell.topTaskId(displayId)
-            _target.value = TargetApp(opened, task, userOf(task))
-        }
-        ok(hint = if (expected != null && top != expected) hintLinkElsewhere(top, expected) else null)
-    }
+    /** Helper for opening links and system actions, see [LinkAndSystemActions]. */
+    internal val links = LinkAndSystemActions(this)
 
-    /**
-     * Who opens a link when the deny list is non-empty and no app is specified: use the system default if it is not blocked, otherwise the first unblocked candidate; if every capable app is blocked, refuse.
-     * Null when the list is empty or no app can handle it (hand it to the system as usual without an extra check).
-     */
-    internal fun allowedLinkHandler(action: String?, uri: String?): String? {
-        val access = appAccess.current()
-        if (access.blocked.isEmpty()) return null
-        val intent = Intent(action ?: Intent.ACTION_VIEW).apply {
-            uri?.let { data = android.net.Uri.parse(it) }
-            addCategory(Intent.CATEGORY_DEFAULT)
-        }
-        val pm = a11y.packageManager
-        val candidates = runCatching { pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY).map { it.activityInfo.packageName }.distinct() }
-            .getOrDefault(emptyList())
-        if (candidates.isEmpty()) return null
-        val allowed = candidates.filter { access.denial(it) == null }
-        if (allowed.isEmpty()) access.denial(candidates.first())?.let { throw it }
-        val default = runCatching { pm.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName }.getOrNull()
-        return default?.takeIf { it in allowed } ?: allowed.first()
-    }
-
-    /** Who opens a link when no app is specified: the one the system picks directly; null when the user must choose (it lands in the system chooser) or it cannot be read. */
-    internal fun linkHandler(action: String?, uri: String?): String? = runCatching {
-        if (action != null || uri == null) return null
-        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(uri)).addCategory(Intent.CATEGORY_BROWSABLE)
-        a11y.packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
-    }.getOrNull()?.takeIf { it !in systemPickers }
-
-    internal fun hintLinkElsewhere(top: String?, expected: String) =
-        "The link opened, but the screen shows ${top ?: "no app yet"} instead of $expected: a system chooser or a redirect page may have taken it. Observe before acting."
+    override suspend fun openLink(action: String?, uri: String?, packageName: String?): ActionResult = links.openLink(action, uri, packageName)
 
     /**
      * After a task is moved back to this screen, wait for its window to appear in the accessibility window list before letting the Agent read the screen;
@@ -361,94 +245,12 @@ class AndroidScreen(
 
     override suspend fun listApps(): List<Pair<String, String>> = withContext(Dispatchers.IO) { launchableApps(a11y.packageManager, a11y.packageName) }
 
-    // ---------- System actions ----------
-
-    /**
-     * Performs system actions through standard Android intents (see [SystemIntents]). First check on Claire's side who handles it (capability detection, no display needed): none means not_supported;
-     * with several, [SystemIntents.choose] picks one explicitly. Then hand it to the built-in helper to launch onto Claire's screen (creating the display on first use), watching the main screen before and after as usual.
-     * Alarms and timers are supposed to be set silently: afterwards read the system's next alarm to verify; if the app opened a UI anyway, report that truthfully. The alarm list and new calendar events require waiting for that app to come to the top.
-     */
-    override suspend fun systemAction(action: SystemAction): SystemActionResult = withContext(Dispatchers.IO) {
-        val intent = SystemIntents.toIntent(SystemIntents.spec(action))
-        val pm = a11y.packageManager
-        val handlers = runCatching {
-            pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY).map {
-                SystemIntents.Handler(it.activityInfo.packageName, it.activityInfo.name, (it.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0)
-            }
-        }.getOrDefault(emptyList())
-        val default = runCatching { pm.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName }.getOrNull()
-        // Only this place knows who handles it: skip blocked ones; if every capable app is blocked, refuse
-        val access = appAccess.current()
-        val allowedHandlers = if (access.blocked.isEmpty()) handlers else handlers.filter { access.denial(it.packageName) == null }
-        if (handlers.isNotEmpty() && allowedHandlers.isEmpty()) access.denial(handlers.first().packageName)?.let { throw it }
-        val handler = SystemIntents.choose(allowedHandlers, default)
-            ?: return@withContext SystemActionResult(ActionResult.Failed(SystemActionResult.NOT_SUPPORTED))
-        val pkg = handler.packageName
-        intent.component = android.content.ComponentName(pkg, handler.className)
-        if (checkOtherTasks && !action.silent && !reserve(pkg)) return@withContext SystemActionResult(IN_USE_BY_OTHER, pkg)
-        val alarms = a11y.getSystemService(AlarmManager::class.java)
-        val alarmBefore = runCatching { alarms?.nextAlarmClock?.triggerTime }
-        val id = display.get().displayId
-        val topBefore = ScreenReader.topPackage(windows())
-        val beforeTree = treeHash()
-        val startedAt = System.nanoTime()
-        val w = spill.armSpillWatch()
-        // The shell may lack the permission the handling page requires (setting an alarm): prepare one launched as Claire
-        val asMika = PendingIntent.getActivity(a11y, SYSTEM_ACTION_REQUEST, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        // Silent operations (alarms, timers) open no UI and are not muted: the clock must ring when due
-        if (!action.silent) beforeOpen(pkg, null)
-        val code = runCatching { shell.startSystemAction(id, intent, asMika) }.getOrDefault(ShellService.START_ERROR)
-        if (code != ShellService.START_OK && !action.silent) notOpened(pkg, null)
-        when (code) {
-            ShellService.START_OK -> Unit
-            ShellService.START_IN_USE_ON_MAIN -> return@withContext SystemActionResult(ActionResult.Failed("app_in_use_by_user"), pkg)
-            ShellService.START_IN_USE_BY_OTHER -> return@withContext SystemActionResult(IN_USE_BY_OTHER, pkg)
-            ShellService.START_UNRESOLVED -> return@withContext SystemActionResult(ActionResult.Failed(SystemActionResult.NOT_SUPPORTED))
-            else -> return@withContext SystemActionResult(ActionResult.Failed("launch_failed"), pkg)
-        }
-        if (!action.silent) frameGuardSince = startedAt
-        fun top() = ScreenReader.topPackage(windows())
-        var alarmAfter = alarmBefore.getOrNull()
-        if (action is SystemAction.SetAlarm && alarmBefore.isSuccess) {
-            // The clock app usually writes in the background and registers later: wait for the system's next alarm to change, at most for a while
-            val deadline = SystemClock.uptimeMillis() + ALARM_WAIT_MS
-            while (SystemClock.uptimeMillis() < deadline) {
-                alarmAfter = runCatching { alarms?.nextAlarmClock?.triggerTime }.getOrNull()
-                if (alarmAfter != alarmBefore.getOrNull()) break
-                delay(ALARM_POLL_MS)
-            }
-        } else if (!action.silent) {
-            val deadline = SystemClock.uptimeMillis() + LAUNCH_WAIT_MS
-            while (top() != pkg && SystemClock.uptimeMillis() < deadline) delay(POLL_MS)
-        }
-        waitStable(SETTLE_CAP_MS)
-        val landed = top() == pkg
-        // This was supposed to be silent, yet that app's UI appeared on screen
-        val showing = action.silent && landed && topBefore != pkg
-        if (!action.silent || showing) {
-            val changed = top() != topBefore || treeHash() != beforeTree
-            if (changed) awaitFrameAfter(startedAt) else frameGuardSince = null
-        }
-        if (landed && (!action.silent || showing)) {
-            targetPackage = pkg
-            requestedUser = null
-            val task = runCatching { shell.topTaskId(displayId) }.getOrDefault(-1)
-            _target.value = TargetApp(pkg, task, userOf(task))
-        }
-        val hint = if (!action.silent && !landed) hintNotInFront(top(), pkg) else null
-        SystemActionResult(
-            ok(hint = hint, spill = spill.takeSpill(w)), handledBy = pkg,
-            nextAlarmBefore = alarmBefore.getOrNull(), nextAlarmAfter = alarmAfter, alarmReadable = alarmBefore.isSuccess, showing = showing,
-        )
-    }
+    override suspend fun systemAction(action: SystemAction): SystemActionResult = links.systemAction(action)
 
     override suspend fun bulkCalendarInsert(events: List<SystemAction.AddCalendarEvent>): SystemActionResult =
         withContext(Dispatchers.IO) { CalendarBulkWriter.insert(a11y, events) }
 
-    internal fun hintNotInFront(top: String?, expected: String) =
-        "$expected took the action, but the screen shows ${top ?: "no app yet"}. Observe before acting."
-
-    // ---------- Wheel pickers ----------
+    // ---------- Scroll wheel ----------
 
     override suspend fun setWheel(ref: String, snapshotId: String, value: String): WheelOutcome = withContext(Dispatchers.IO) {
         if (!hasDisplay) return@withContext WheelOutcome(false, null, null, 0, "none", error = "no_app_open")
@@ -694,35 +496,8 @@ class AndroidScreen(
         return (if (user == myUser) OpenedElsewhere.MAIN_PROFILE else OpenedElsewhere.OTHER_PROFILE) to user
     }
 
-    // ---------- Ref resolution ----------
-
-    /**
-     * Resolves a ref into an actionable node; when relocation was involved, the second value is the current name of the recovered element, otherwise null.
-     * If the node from the latest snapshot still exists and is unchanged, use it directly; if the snapshot is stale or the node changed, find the unique match in the current UI by the original element's traits.
-     */
-    internal fun resolve(ref: String, snapshotId: String): Pair<AccessibilityNodeInfo, String?>? {
-        val (entry, snapshot) = when (val l = ids.lookup(ref, snapshotId)) {
-            is NodeIds.Lookup.Unknown -> return null
-            is NodeIds.Lookup.Current -> {
-                if (unchanged(l.entry)) return l.entry.node to null
-                l.entry to l.snapshot
-            }
-            is NodeIds.Lookup.Old -> l.entry to l.snapshot
-        }
-        val now = read()
-        return when (val r = relocate(entry.locator, snapshot.locators, now.entries.map { it.locator }, min(screenWidth, screenHeight))) {
-            is Relocation.Found -> now.entries[r.index].let { it.node to it.element.name }
-            else -> null
-        }
-    }
-
-    /** Whether the node still exists and its type, name, resource ID, and position match the snapshot (after list reuse, the same node may hold different content). */
-    internal fun unchanged(entry: NodeEntry): Boolean {
-        val n = entry.node
-        if (!n.refresh()) return false
-        val now = ScreenReader.locatorOf(n, screenWidth, screenHeight) ?: return false
-        return now == entry.locator.copy(context = null)
-    }
+    // ---------- Input fields ----------
+    // Number parsing and field lookup are in FieldResolver.kt; writing into a field is in ClipboardInput.kt; taps, gestures and touch injection are in TouchInjector.kt
 
     internal sealed interface Field {
         /** [tapped]: the given element is not itself an input field; the real field appeared (or got focus) only after tapping it. */
@@ -730,38 +505,7 @@ class AndroidScreen(
         class Missing(val reason: String) : Field
     }
 
-    /**
-     * Finds the field to type into. With a ref: the element itself or an input field inside it; if neither, and it looks like an input entry point (the 'fake search box' on a home page:
-     * clickable, not a button, with a placeholder or a name that looks like search), tap it first; only if the tap succeeds and a field that was not there before now holds focus, use that field.
-     * Without a ref: the field that currently holds input focus.
-     */
-    internal suspend fun findField(ref: String?, snapshotId: String?, tapToFocus: Boolean = true): Field {
-        if (ref != null && snapshotId != null) {
-            val (node, relocatedTo) = resolve(ref, snapshotId) ?: return Field.Missing("ref_expired")
-            val editable = if (ScreenReader.canSetText(node)) node
-                else descendant(node) { ScreenReader.canSetText(it) && visibleInputTarget(it) }
-            if (editable != null) {
-                if (!editable.refresh() || !visibleInputTarget(editable)) return Field.Missing(EDITOR_NOT_VISIBLE)
-                return Field.Found(editable, relocatedTo = relocatedTo)
-            }
-            if (!tapToFocus || !looksLikeInputEntry(node)) return Field.Missing("not_editable")
-            val focusedBefore = focusedEditable()
-            val clicked = withEventClock { clock ->
-                clock.mark()
-                click(node).also { if (it) clock.awaitQuiet(QUIET_MS, FOCUS_WAIT_MS) }
-            }
-            val now = focusedField()
-            return when {
-                clicked && now is Field.Found && now.node != focusedBefore ->
-                    Field.Found(now.node, tapped = true, relocatedTo = relocatedTo)
-                clicked && now is Field.Missing && now.reason == EDITOR_NOT_VISIBLE -> now
-                else -> Field.Missing("not_editable")
-            }
-        }
-        return focusedField()
-    }
-
-    /** Traits used to recognize 'the same input field': type, resource ID, position and size. */
+    /** Features that identify "the same input field": type, resource ID, position and size. */
     internal data class FieldShape(
         val pkg: String?, val windowId: Int, val cls: String?, val rid: String?, val rect: Rect,
     ) {
@@ -772,231 +516,13 @@ class AndroidScreen(
         }
     }
 
-    internal fun sameField(a: FieldShape, n: AccessibilityNodeInfo): Boolean {
-        val b = FieldShape.of(n)
-        if (a.pkg != b.pkg || a.windowId != b.windowId || a.cls != b.cls || a.rid != b.rid) return false
-        // Size must be nearly identical; position may shift a little as the whole page moves (pages often move up when typing), using the same limit as ref recovery
-        val short = min(screenWidth, screenHeight)
-        val sizeTol = short * SAME_FIELD_SIZE
-        val moveTol = short * RELOCATE_MAX_SHIFT
-        return kotlin.math.abs(a.rect.width() - b.rect.width()) <= sizeTol && kotlin.math.abs(a.rect.height() - b.rect.height()) <= sizeTol &&
-            kotlin.math.hypot((a.rect.centerX() - b.rect.centerX()).toDouble(), (a.rect.centerY() - b.rect.centerY()).toDouble()) <= moveTol
-    }
+    /** The first node satisfying [test], starting at [node] and walking up to [MAX_ANCESTORS] levels. */
+    internal fun ancestorOrSelf(node: AccessibilityNodeInfo, test: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? =
+        node.selfAndAncestors(MAX_ANCESTORS).firstOrNull(test)
 
-    /** Looks like an input entry point: clickable, not a button class, and has a placeholder or a name that looks like search. */
-    internal fun looksLikeInputEntry(n: AccessibilityNodeInfo): Boolean {
-        val target = ancestorOrSelf(n) { it.isClickable } ?: return false
-        val cls = target.className?.toString().orEmpty()
-        if (cls.endsWith("Button")) return false
-        if (ScreenReader.placeholderOf(n) != null || !n.hintText.isNullOrBlank()) return true
-        val name = ScreenReader.ownLabel(n) ?: ScreenReader.ownLabel(target) ?: return false
-        return SEARCH_WORDS.any { name.contains(it, ignoreCase = true) }
-    }
-
-    /**
-     * Something on this screen holds input focus (even if it is not an input field in the tree, such as a custom-drawn app UI holding focus as a whole), or the IME is showing.
-     * When neither is true, key events have no field to go to: input fields invisible to the tree also only receive a paste while holding focus.
-     */
-    internal fun somethingHoldsInputFocus(): Boolean =
-        textInput.imeBounds() != null || focusedInput() != null
-
-    internal fun focusedInput(): AccessibilityNodeInfo? {
-        val content = ScreenReader.contentWindows(windows())
-        val focusedWindow = content.firstOrNull { it.isFocused }
-        if (focusedWindow != null) return focusedWindow.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        return content.firstNotNullOfOrNull { it.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) }
-    }
-
-    internal fun visibleInputTarget(node: AccessibilityNodeInfo): Boolean =
-        node.isEnabled && ScreenReader.locatorOf(node, screenWidth, screenHeight) != null
-
-    /** Keep a known hidden native editor distinct from a custom editor absent from the tree. */
-    internal fun focusedField(): Field {
-        val focus = focusedInput() ?: return Field.Missing(NO_FOCUS)
-        val editor = if (ScreenReader.canSetText(focus)) focus
-            else descendant(focus) { it.isFocused && ScreenReader.canSetText(it) } ?: return Field.Missing(NO_FOCUS)
-        return if (editor.refresh() && visibleInputTarget(editor)) Field.Found(editor) else Field.Missing(EDITOR_NOT_VISIBLE)
-    }
-
-    internal fun focusedEditable(): AccessibilityNodeInfo? = (focusedField() as? Field.Found)?.node
-
-    internal fun blockedFocusedEditor(): Boolean = (focusedField() as? Field.Missing)?.reason == EDITOR_NOT_VISIBLE
-
-    // ---------- Low-level operations ----------
-
-    internal fun isClickableTarget(node: AccessibilityNodeInfo): Boolean =
-        node.isEnabled && (node.isClickable || node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_CLICK })
-
-    /** When a coordinate tap has no effect, look up the smallest clickable control at that point and fall back to an accessibility click; do not add a tap when it hits an outward-facing/irreversible button or a large container. */
-    internal fun clickNodeAt(x: Int, y: Int, clock: EventClock): Boolean {
-        if (!hasDisplay || handedOver() || textInput.imeBounds()?.contains(x, y) == true) return false
-        val window = ScreenReader.contentWindows(windows()).firstOrNull {
-            Rect().also(it::getBoundsInScreen).contains(x, y)
-        }?.takeIf { it.type == AccessibilityWindowInfo.TYPE_APPLICATION } ?: return false
-        val entries = ScreenReader.read(listOf(window), screenWidth, screenHeight).entries
-        val rect = Rect()
-        val hitEntries = entries.filter { entry ->
-            entry.node.getBoundsInScreen(rect)
-            rect.intersect(0, 0, screenWidth, screenHeight) && rect.contains(x, y)
-        }
-        if (hitEntries.isEmpty()) return false
-        if (hitEntries.any { ClickFallback.mayBeOutward(it.element.name, it.locator.resourceId, clickable = it.element.clickable) }) return false
-        val seen = HashSet<AccessibilityNodeInfo>()
-        val candidates = mutableListOf<ClickFallback.Candidate<AccessibilityNodeInfo>>()
-        for (entry in hitEntries) {
-            val target = ancestorOrSelf(entry.node) { isClickableTarget(it) } ?: continue
-            if (!seen.add(target) || !target.isVisibleToUser) continue
-            target.getBoundsInScreen(rect)
-            if (!rect.intersect(0, 0, screenWidth, screenHeight) || rect.isEmpty) continue
-            candidates += ClickFallback.Candidate(
-                item = target,
-                left = rect.left, top = rect.top, right = rect.right, bottom = rect.bottom,
-                label = ScreenReader.labelOf(target).ifBlank { entry.element.name.ifBlank { null } },
-                resourceId = target.viewIdResourceName ?: entry.locator.resourceId,
-                scrollable = target.isScrollable,
-                webView = target.className == WEB_VIEW,
-            )
-        }
-        val picked = ClickFallback.pickTarget(x, y, screenWidth, screenHeight, candidates) ?: return false
-        clock.mark()
-        return picked.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-    }
-
-    /** Prefer clicking the node (or its nearest clickable ancestor); if that fails, gesture at its center, and finally inject a touch. */
-    internal suspend fun click(node: AccessibilityNodeInfo): Boolean {
-        val target = ancestorOrSelf(node) { isClickableTarget(it) }
-        if (target != null && target.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
-        val rect = android.graphics.Rect().also { node.getBoundsInScreen(it) }
-        return touch(pacing.within(rect.left, rect.top, rect.right, rect.bottom))
-    }
-
-    internal suspend fun tapAt(x: Int, y: Int): Boolean = touch(pacing.near(x, y))
-
-    /** Taps once at this point: pause briefly before touching down, then hold for a random short moment. If the accessibility gesture fails, the built-in helper injects the touch. */
-    internal suspend fun touch(at: Pair<Int, Int>): Boolean {
-        val (x, y) = at
-        delay(pacing.approach())
-        val press = pacing.press()
-        if (a11y.gesture(displayId, Path().apply { moveTo(x.toFloat(), y.toFloat()) }, press)) return true
-        if (pacing.paced && injectStroke(listOf(GesturePacing.Point(x.toDouble(), y.toDouble(), 0), GesturePacing.Point(x.toDouble(), y.toDouble(), press)))) return true
-        return shell.injectTap(displayId, x, y)
-    }
-
-    /**
-     * Slides one finger along [points]. When paced, [GesturePacing.stroke] schedules the time of each point and the built-in helper injects them point by point (the app sees real fast-then-slow speed);
-     * when the helper cannot inject, fall back to an accessibility gesture along the same curve (the system follows the path at constant speed, lacking only the pacing). Without pacing it works as before: an accessibility gesture follows the polyline at constant speed for the given duration.
-     */
-    internal suspend fun drag(points: List<Pair<Int, Int>>, durationMs: Long, bow: Boolean): Boolean {
-        if (!pacing.paced) return a11y.gesture(displayId, pathOf(points), durationMs)
-        delay(pacing.approach())
-        val stroke = pacing.stroke(points.map { it.first.toDouble() to it.second.toDouble() }, durationMs, bow, screenWidth to screenHeight)
-        if (injectStroke(stroke.points)) return true
-        return a11y.gesture(displayId, pathOf(stroke.points.map { it.x.roundToInt() to it.y.roundToInt() }), stroke.durationMs)
-    }
-
-    internal fun injectStroke(points: List<GesturePacing.Point>): Boolean = runCatching {
-        shell.injectStroke(
-            displayId,
-            IntArray(points.size) { points[it].x.roundToInt() },
-            IntArray(points.size) { points[it].y.roundToInt() },
-            LongArray(points.size) { points[it].t },
-        )
-    }.getOrDefault(false)
-
-    internal fun pathOf(points: List<Pair<Int, Int>>) = Path().apply {
-        moveTo(points.first().first.toFloat(), points.first().second.toFloat())
-        points.drop(1).forEach { lineTo(it.first.toFloat(), it.second.toFloat()) }
-    }
-
-    /**
-     * Editable areas in web pages (contenteditable) only accept real input: SET_TEXT changes only the page's text, the editor receives no input events,
-     * and the app treats it as no input ('Done' stays disabled, nothing is saved on exit). For these fields, select the existing content and paste, or press delete instead.
-     */
-    internal fun inWebView(node: AccessibilityNodeInfo) = ancestorOrSelf(node) { it.className == WEB_VIEW } != null
-
-    /**
-     * Selects the existing content, then pastes (or presses delete to clear). Returning null means the clipboard cannot be used safely and no text was changed;
-     * other results use the three states of [AsciiTextKeys]. If selection fails, no delete or paste is sent, avoiding deleting a single character or inserting at the cursor.
-     */
-    internal fun inputText(node: AccessibilityNodeInfo, text: String): Int? {
-        if (!node.refresh() || !visibleInputTarget(node)) return AsciiTextKeys.NOT_SENT
-        val before = node.text?.toString().orEmpty()
-        fun selectAll(): Boolean {
-            if (!node.refresh() || !visibleInputTarget(node) || node.text?.toString().orEmpty() != before) return false
-            if (before.isEmpty()) return true
-            val range = Bundle().apply {
-                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
-                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, before.length)
-            }
-            return node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, range)
-        }
-        if (text.isEmpty()) {
-            if (before.isEmpty()) return AsciiTextKeys.DISPATCHED
-            if (!selectAll()) return AsciiTextKeys.NOT_SENT
-            if (!node.refresh() || !visibleInputTarget(node)) return AsciiTextKeys.NOT_SENT
-            return if (shell.injectKey(displayId, KeyEvent.KEYCODE_DEL)) AsciiTextKeys.DISPATCHED else AsciiTextKeys.UNCONFIRMED
-        }
-        return withClipboardText(text) {
-            if (!selectAll()) return@withClipboardText AsciiTextKeys.NOT_SENT
-            if (!node.refresh() || !visibleInputTarget(node)) return@withClipboardText AsciiTextKeys.NOT_SENT
-            // A standard action returning false may still have had an effect; treat it as uncertain and do not send the shortcut again.
-            if (!node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) return@withClipboardText AsciiTextKeys.UNCONFIRMED
-            // The app reads the clipboard asynchronously: wait for the text to change before restoring, at most for a while
-            val deadline = SystemClock.uptimeMillis() + PASTE_WAIT_MS
-            while (SystemClock.uptimeMillis() < deadline) {
-                if (node.refresh() && node.text?.toString().orEmpty() != before) break
-                Thread.sleep(POLL_MS)
-            }
-            AsciiTextKeys.DISPATCHED
-        }
-    }
-
-    /** Runs synchronously while holding the global clipboard lock; after setting, back up as far as possible regardless of the result, and clear the held flag and encrypted backup only once restoration is confirmed. */
-    internal fun withClipboardText(text: String, action: () -> Int): Int? {
-        clipLock.lock()
-        try {
-            clipHeld(true)
-            val set = runCatching { shell.setClipText(text) }.getOrDefault(ShellService.CLIP_FAILED)
-            runCatching { shell.savedClipText() }.getOrNull()?.let { clipSaved(it, text) }
-            if (set != ShellService.CLIP_SET) return null
-            return action()
-        } finally {
-            val restored = runCatching { shell.restoreClip() }.getOrDefault(false)
-            try {
-                if (restored) clipHeld(false)
-            } finally {
-                clipLock.unlock()
-            }
-        }
-    }
-
-    internal fun setText(node: AccessibilityNodeInfo, text: String): Boolean {
-        if (!node.refresh() || !visibleInputTarget(node)) return false
-        val args = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }
-        return node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-    }
-
-    internal inline fun ancestorOrSelf(node: AccessibilityNodeInfo, test: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? {
-        var n: AccessibilityNodeInfo? = node
-        var depth = 0
-        while (n != null && depth <= MAX_ANCESTORS) {
-            if (test(n)) return n
-            n = n.parent
-            depth++
-        }
-        return null
-    }
-
-    internal fun descendant(node: AccessibilityNodeInfo, test: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? {
-        val queue = ArrayDeque<AccessibilityNodeInfo>().apply { add(node) }
-        var visited = 0
-        while (queue.isNotEmpty() && visited++ < 500) {
-            val n = queue.removeFirst()
-            if (test(n)) return n
-            for (i in 0 until n.childCount) n.getChild(i)?.let(queue::add)
-        }
-        return null
-    }
+    /** The first node satisfying [test], starting at [node] and searching down (breadth-first, at most [MAX_DESCENDANTS] nodes). */
+    internal fun descendant(node: AccessibilityNodeInfo, test: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? =
+        node.breadthFirst(MAX_DESCENDANTS).firstOrNull(test)
 
     // ---------- Frames ----------
 
@@ -1127,6 +653,7 @@ class AndroidScreen(
             "Tap the one the task needs (for a message, the one that sends to a contact or chat); do not share again."
         const val HINT_COLD_IGNORED = "coldIgnored: app has a task outside Claire's screen, so it was not restarted (that would wipe the user's state there). It was opened as-is; navigate back to its start screen yourself if needed."
         const val MAX_ANCESTORS = 8
+        const val MAX_DESCENDANTS = 500
 
         // Hover, touch exploration, gesture detection, and accessibility focus are not changes in screen content
         const val IGNORED_EVENTS = AccessibilityEvent.TYPE_VIEW_HOVER_ENTER or AccessibilityEvent.TYPE_VIEW_HOVER_EXIT or

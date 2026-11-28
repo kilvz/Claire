@@ -3,6 +3,7 @@ package com.wangzan101.mika.cap.sandbox
 import android.content.Context
 import android.net.ConnectivityManager
 import android.util.Log
+import com.wangzan101.mika.cap.OutputCollector
 import com.wangzan101.mika.chat.SharedFile
 import com.wangzan101.mika.core.cap.sandbox.CommandResult
 import com.wangzan101.mika.core.workspace.GatedFile
@@ -243,10 +244,7 @@ class AndroidSandbox internal constructor(
                 val cmd = ProcRunner.argv(dirs, ws, rel, 3600, network, standIns(), argv)
                 val env = ProcRunner.env(dirs, null, null, workspace, if (network) proxy() else "", extra = environment)
                 val p = withContext(launcherThread + NonCancellable) {
-                    ProcessBuilder(cmd).redirectErrorStream(false).apply {
-                        environment().clear()
-                        environment().putAll(env)
-                    }.start()
+                    sandboxProcess(cmd, env, mergeStderr = false).start()
                 }
                 started.set(p)
                 // A revocation that falls between taking the lease and registering the process was not seen by onRevoke: stop it here
@@ -306,10 +304,7 @@ class AndroidSandbox internal constructor(
                 )
                 val env = ProcRunner.env(dirs, null, null, workspace, if (network) proxy() else "", pty = true)
                 val p = withContext(launcherThread + NonCancellable) {
-                    ProcessBuilder(cmd).redirectErrorStream(true).apply {
-                        environment().clear()
-                        environment().putAll(env)
-                    }.start().also(started::set)
+                    sandboxProcess(cmd, env, mergeStderr = true).start().also(started::set)
                 }
                 if (lease.revoked) {
                     stopNow(p)
@@ -544,18 +539,15 @@ class AndroidSandbox internal constructor(
             var started: Process? = null
             try {
                 withContext(launcherThread + NonCancellable) {
-                    started = start(ProcessBuilder(cmd).redirectErrorStream(true).apply {
-                        environment().clear()
-                        environment().putAll(env)
-                    })
+                    started = start(sandboxProcess(cmd, env, mergeStderr = true))
                 }
             } catch (e: CancellationException) {
                 started?.let(::abandon)
                 throw e
             }
             val p = started!!
-            // Output is read on a plain thread: a blocking read cannot be cancelled, so putting it in a coroutine would make cancellation wait indefinitely
-            val collector = OutputCollector()
+            // Read output on a plain thread: a blocking read cannot be cancelled, and putting it in a coroutine would make cancellation wait forever
+            val collector = OutputCollector(ProcRunner.OUTPUT_LIMIT)
             val reader = thread(isDaemon = true, name = "mika-sandbox-output") { runCatching { p.inputStream.use(collector::drain) } }
             try {
                 // Cancelled during startup: throw here and the catch below kills the process just started
@@ -579,7 +571,28 @@ class AndroidSandbox internal constructor(
         /** SIGTERM first (the launcher clears the whole process tree on receipt), then SIGKILL if it is still alive after [DESTROY_GRACE_MS]. */
         private fun abandon(p: Process) {
             p.destroy()
-            thread(isDaemon = true, name = "mika-sandbox-reaper") { if (!p.waitFor(DESTROY_GRACE_MS, TimeUnit.MILLISECONDS)) p.destroyForcibly() }
+            reapAsync(p, "mika-sandbox-reaper")
+        }
+    }
+}
+
+/** ProcessBuilder for the sandbox process: the environment is only [env] (the app environment is not inherited); when [mergeStderr] is true, stderr merges into stdout. */
+private fun sandboxProcess(cmd: List<String>, env: Map<String, String>, mergeStderr: Boolean): ProcessBuilder =
+    ProcessBuilder(cmd).redirectErrorStream(mergeStderr).apply {
+        environment().clear()
+        environment().putAll(env)
+    }
+
+/**
+ * A daemon thread [name] is the backstop: if [p] has not exited within [DESTROY_GRACE_MS], SIGKILL it, then call [after] (either way).
+ * No SIGTERM is sent: the caller decides the order (the terminal sets the backstop before destroying).
+ */
+private fun reapAsync(p: Process, name: String, after: () -> Unit = {}) {
+    thread(isDaemon = true, name = name) {
+        try {
+            if (!p.waitFor(DESTROY_GRACE_MS, TimeUnit.MILLISECONDS)) p.destroyForcibly()
+        } finally {
+            after()
         }
     }
 }
@@ -606,14 +619,8 @@ private class SandboxProcessHandle(
     override fun close() {
         runCatching { process.outputStream.close() }
         runCatching { process.destroy() }
-        // The lease is returned only after the process tree is gone: a process still writing the workspace must not collide with a reset (a reset revokes first and stops processes itself, without waiting here)
-        thread(isDaemon = true, name = "mika-sandbox-stdio-reaper") {
-            try {
-                if (!process.waitFor(DESTROY_GRACE_MS, TimeUnit.MILLISECONDS)) process.destroyForcibly()
-            } finally {
-                lease.close()
-            }
-        }
+        // Return the lease only after the process tree is gone: a process still writing the workspace must not collide with a reset (a reset takes it back and stops processes itself, without waiting here)
+        reapAsync(process, "mika-sandbox-stdio-reaper") { lease.close() }
         runCatching { process.inputStream.close() }
         runCatching { process.errorStream.close() }
     }
@@ -639,9 +646,7 @@ private class SandboxShellHandle(
     override fun close() {
         // Android's destroy() signals the process before closing its pipes, but it can
         // still wait on a writer during stream cleanup. Arm the watchdog before calling it.
-        thread(isDaemon = true, name = "mika-terminal-reaper") {
-            if (!process.waitFor(DESTROY_GRACE_MS, TimeUnit.MILLISECONDS)) process.destroyForcibly()
-        }
+        reapAsync(process, "mika-terminal-reaper")
         runCatching { process.destroy() }
         runCatching { process.outputStream.close() }
         runCatching { process.inputStream.close() }

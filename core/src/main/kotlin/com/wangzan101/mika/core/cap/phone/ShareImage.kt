@@ -1,66 +1,14 @@
 package com.wangzan101.mika.core.cap.phone
 
-import com.wangzan101.mika.core.screen.observation.ObsKind
-import com.wangzan101.mika.core.screen.observation.Observation
-import com.wangzan101.mika.core.prompt.Prompts
-import com.wangzan101.mika.core.tool.ArgError
-import com.wangzan101.mika.core.tool.Args
-import com.wangzan101.mika.core.tool.LinkPolicy
-import com.wangzan101.mika.core.tool.Risk
 import com.wangzan101.mika.core.tool.ToolContext
-import com.wangzan101.mika.core.tool.ToolDef
-import com.wangzan101.mika.core.tool.ToolExecution
 import com.wangzan101.mika.core.tool.Verb
-import com.wangzan101.mika.core.tool.str
-import com.wangzan101.mika.core.screen.uistate.action
-import com.wangzan101.mika.core.workspace.SandboxPaths
-import kotlinx.serialization.json.JsonPrimitive
 
-/**
- * Shares an image from the workspace to an app (ACTION_SEND + EXTRA_STREAM), opening its share sheet on Claire's screen:
- * it only opens, it never sends; the model picks the recipient and taps "send" on that page with screen tools, and sending still goes through the existing confirmation gate.
- */
-internal object ShareImage : PhoneTool {
+/** Shares a workspace image to an app, opening its share page but never sending it. */
+internal object ShareImage : ShareFileTool("phone_share_image", "image",
+    "/workspace/out/images/cat.png or /workspace/inbox/photo.jpg") {
     override val verb = Verb.ShareImage
     override val label = "Share image to app"
-    override val risk = Risk.Write
-    override val showsScreenAfter = true
-    override val logged = true
-    override val def = ToolDef("phone_share_image", Prompts.tool("phone_share_image"),
-        mapOf(
-            "package" to str("Exact package name of the app to share the image to, e.g. com.example.app."),
-            "path" to str("Workspace image path, e.g. /workspace/out/images/cat.png or /workspace/inbox/photo.jpg."),
-            "text" to str("Optional caption to share with the image, at most 2000 characters."),
-        ),
-        listOf("package", "path"))
-
     override fun available(ctx: ToolContext) = ctx.phone.screen.canShareImage
-    override fun offered(ctx: ToolContext) = available(ctx)
-
-    override suspend fun execute(a: Args, ctx: ToolContext): ToolExecution {
-        val p = a.str("package")!!
-        if (!LinkPolicy.PACKAGE.matches(p)) throw ArgError("package", "must be an Android package name")
-        val path = a.str("path", max = 500)!!.trim()
-        val prefix = SandboxPaths.WORKSPACE + "/"
-        if (!path.startsWith(prefix) || path.removePrefix(prefix).split('/').any { it.isEmpty() || it == "." || it == ".." }) {
-            throw ArgError("path", "must be a workspace image path under $prefix")
-        }
-        val text = a.str("text", max = 2000)
-        // The app switched, so a previously refused payment declaration no longer belongs to this run
-        ctx.refusedPay = null
-        val r = ctx.action(ctx.phone.screen.shareImage(p, path, text))
-        if (r.content["ok"] != JsonPrimitive(true)) return r
-        ctx.appOpened = true
-        return r
-    }
-
-    override fun logTarget(o: kotlinx.serialization.json.JsonObject, r: ToolExecution, ctx: ToolContext) =
-        (o["package"] as? JsonPrimitive)?.content
-
-    override fun observations(o: kotlinx.serialization.json.JsonObject, r: ToolExecution, log: com.wangzan101.mika.core.tool.EvidenceLog): List<Observation> {
-        if (r.content["ok"] != JsonPrimitive(true)) return emptyList()
-        return listOfNotNull((o["package"] as? JsonPrimitive)?.content?.let { p ->
-            Observation(ObsKind.Fact, "$name opened the image share page of $p (not sent yet)", source = PHONE)
-        })
-    }
+    override suspend fun share(ctx: ToolContext, packageName: String, path: String, text: String?) =
+        ctx.phone.screen.shareImage(packageName, path, text)
 }

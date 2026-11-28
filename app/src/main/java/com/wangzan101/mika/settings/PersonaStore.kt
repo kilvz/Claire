@@ -2,6 +2,7 @@ package com.wangzan101.mika.settings
 
 import com.wangzan101.mika.core.prompt.PersonaPrompt
 import com.wangzan101.mika.core.prompt.PersonaStyle
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -181,12 +182,7 @@ class PersonaStore(private val dir: File) {
     @Synchronized private fun save(list: List<Persona>, active: String? = _activeId.value) {
         dir.mkdirs()
         val text = json.encodeToString(PersonaFile(personas = list, active = active))
-        val tmp = File(dir, "${file.name}.tmp")
-        tmp.writeText(text)
-        if (!tmp.renameTo(file)) {
-            file.writeText(text)
-            tmp.delete()
-        }
+        AtomicFiles.write(file, text, durable = false, move = AtomicFiles.Move.Rename, fallback = AtomicFiles.Fallback.WriteDirect)
         _personas.value = list
         _activeId.value = active
     }
@@ -201,8 +197,8 @@ class PersonaStore(private val dir: File) {
             // The active one must point at a persona still in the list (hand-edited files and dangling ids left by older versions both count as none)
             Loaded(personas, stored.active?.takeIf { id -> personas.any { it.id == id } })
         }.getOrElse {
-            // Keep an unreadable old file around so the next save does not simply overwrite it
-            runCatching { file.renameTo(File(dir, "${file.name}.bad-${System.currentTimeMillis()}")) }
+            // Keep an old file that cannot be parsed, so the next save does not overwrite it
+            runCatching { AtomicFiles.quarantine(file, AtomicFiles.Quarantine.RenameBad, dedupe = false) }
             Loaded(emptyList(), null)
         }
     }

@@ -2,12 +2,10 @@ package com.wangzan101.mika.proactive
 
 import com.wangzan101.mika.core.proactive.NoticeJournal
 import com.wangzan101.mika.core.proactive.NoticeJournalData
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import com.wangzan101.mika.settings.KeyCipher
 import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 /**
  * The notification journal (the raw notifications used by the daily notification digest, see
@@ -45,8 +43,7 @@ class NoticeJournalFile(dir: File, private val cipher: KeyCipher, private val cl
     override fun save(data: NoticeJournalData) {
         poolDir.mkdirs()
         val bytes = cipher.encrypt(StoreCodec.write(NoticeJournalData.serializer(), data, VERSION))
-        FileOutputStream(tmp).use { it.write(bytes); it.fd.sync() }
-        Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        AtomicFiles.write(file, bytes, durable = true, temp = tmp)
     }
 
     /** Delete everything (the file and the temp file); also works when it cannot be read. */

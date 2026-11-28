@@ -131,21 +131,30 @@ class FrontDesk(
         if (!report && current is TaskState.Terminal) return
         scope.launch {
             var previous: TaskState? = if (report) null else current
+            // Only say "started" for tasks that were queued: one dispatched and already running was reported in the dispatch result, so saying it again repeats itself.
+            var queued = phaseOf(taskId, current) == DeskTaskPhase.Queued
             // Stop subscribing after the final state arrives; later changes to the flow are ignored
             states.transformWhile { emit(it); it !is TaskState.Terminal }.collect { next ->
                 val event = DeskEvents.classify(taskId, previous, next)
                 previous = next
                 updateView(taskId, title, next)
-                if (event != null && policy.shouldReport(event)) reports.trySend(DeskReport(event, title))
+                val wasQueued = queued
+                if (phaseOf(taskId, next) == DeskTaskPhase.Queued) queued = true
+                // Even a "started" that is not said goes through the reporting rules, so the progress quiet period counts from the start and it does not report progress right away.
+                val say = event != null && policy.shouldReport(event) && (event !is DeskEvent.Started || wasQueued)
+                if (say) reports.trySend(DeskReport(event!!, title))
             }
         }
     }
 
+    /** Just dispatched but not yet picked up by the task service (Idle): not in the start queue means it is starting, not queued (otherwise the card flashes "queued" and the front desk repeats it). */
+    private fun phaseOf(taskId: String, state: TaskState): DeskTaskPhase =
+        if (state == TaskState.Idle && tasks.queuePosition(taskId) == null) DeskTaskPhase.Running else deskPhaseOf(state)
+
     private fun updateView(taskId: String, title: String, state: TaskState) {
         val now = clock()
         views.update { list ->
-            // Just dispatched but not yet picked up by the task service (Idle): not in the start queue means it is starting, not queued (otherwise the card flashes "queued" and the front desk repeats it)
-            val phase = if (state == TaskState.Idle && tasks.queuePosition(taskId) == null) DeskTaskPhase.Running else deskPhaseOf(state)
+            val phase = phaseOf(taskId, state)
             val line = lineOf(state)
             val old = list.firstOrNull { it.taskId == taskId }
             val before = old?.recent.orEmpty()

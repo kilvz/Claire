@@ -403,8 +403,8 @@ class DeskChatOpsTest {
         runCurrent()
         h.port.states.getValue("child-1").value = TaskState.Succeeded("明早 8 点")
         runCurrent()
-        // Start and completion both went to the call
-        assertEquals(listOf("child-1", "child-1"), heard)
+        // 办好了给了通话(当场就开始的不报开始)
+        assertEquals(listOf("child-1"), heard)
         assertTrue(brain.notices.isEmpty())
 
         handle.close()
@@ -416,7 +416,7 @@ class DeskChatOpsTest {
         // The call ended and the chat page took back over: the raw result becomes a one-line report, without going through the front-desk model
         assertTrue(brain.notices.isEmpty())
         assertEquals("后天 9 点", h.vm.ui.value.exchanges.last().deskReply)
-        assertEquals(listOf("child-1", "child-1"), heard)
+        assertEquals(listOf("child-1"), heard)
         assertTrue(h.sunk.isEmpty())
     }
 

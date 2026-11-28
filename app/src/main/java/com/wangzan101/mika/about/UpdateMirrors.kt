@@ -1,5 +1,6 @@
 package com.wangzan101.mika.about
 
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -185,13 +186,8 @@ class UpdateMirrorStore(
         if (!parent.isDirectory && !parent.mkdirs()) return false
         return try {
             val json = storageJson.encodeToString(MirrorSettings(enabled, mirrors))
-            // Write a temporary file first and then rename it, so being killed halfway cannot leave half a file. Renaming fails when the target already exists, in which case fall back to overwriting it.
-            val tmp = File(parent, "${file.name}.tmp")
-            tmp.writeText(json)
-            if (!tmp.renameTo(file)) {
-                file.writeText(json)
-                tmp.delete()
-            }
+            // Write a temp file first, then rename it, so a kill halfway through does not leave half a file. Rename fails when the target already exists, so fall back to overwriting.
+            AtomicFiles.write(file, json, durable = false, move = AtomicFiles.Move.Rename, fallback = AtomicFiles.Fallback.WriteDirect)
             file.isFile
         } catch (_: IOException) {
             false

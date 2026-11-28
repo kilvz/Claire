@@ -60,6 +60,15 @@ class VoicePlayer(private val context: Context) {
         prepareFile(ticket, bytes, mime)
     }
 
+    /** Plays a finished clip and waits until it finishes or fails; for audition tests that need to know whether sound really came out and support stopping at any time. */
+    suspend fun playAndAwait(bytes: ByteArray, mime: String, onStarted: () -> Unit = {}) = loadAndPlay { ticket ->
+        val completion = CompletableDeferred<VoicePlayback>()
+        prepareFile(ticket, bytes, mime, onStarted, completion)
+        val result = completion.await()
+        if (result is VoicePlayback.Error) error(result.message)
+        if (tickets.owns(ticket)) _state.value = VoicePlayback.Idle
+    }
+
     /** Streams while synthesizing when the service supports it; other services or speech rates keep using the full audio response. */
     suspend fun play(
         model: TtsModel,

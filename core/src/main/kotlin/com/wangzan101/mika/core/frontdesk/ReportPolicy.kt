@@ -3,7 +3,7 @@ package com.wangzan101.mika.core.frontdesk
 import com.wangzan101.mika.core.agent.TaskState
 
 /**
- * Which task events the front desk says on its own: start, queueing, asking the user to answer or act, and ending are always said; a cancellation by the user is not;
+ * Which task events the front desk says on its own: start, queueing, asking the user to answer or act, and ending are always said (a task dispatched and started immediately does not report "started"; [FrontDesk] filters that out); a cancellation by the user is not;
  * progress is not said within [progressQuietMs] after the same task's last report, to avoid nagging; when the user asks about progress the front desk answers from the task board, not through this gate.
  * [shouldReport] returning true counts as reported and restarts the timer.
  */

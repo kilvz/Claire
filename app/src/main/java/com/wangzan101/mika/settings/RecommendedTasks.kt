@@ -1,5 +1,6 @@
 package com.wangzan101.mika.settings
 
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -163,13 +164,8 @@ class RecommendedTaskStore(private val file: File, private val ids: () -> String
                     if (task.fillIn) put("fillIn", true)
                 }
             }).toString()
-            // Write a temporary file and then rename it, so being killed halfway leaves no partial file. The rename fails when the target already exists, in which case the file is overwritten directly.
-            val tmp = File(parent, "${file.name}.tmp")
-            tmp.writeText(json)
-            if (!tmp.renameTo(file)) {
-                file.writeText(json)
-                tmp.delete()
-            }
+            // Write a temp file first, then rename it, so a kill halfway through does not leave half a file. Rename fails when the target already exists, so fall back to overwriting.
+            AtomicFiles.write(file, json, durable = false, move = AtomicFiles.Move.Rename, fallback = AtomicFiles.Fallback.WriteDirect)
             file.isFile
         } catch (_: IOException) {
             false

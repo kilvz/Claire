@@ -1,5 +1,6 @@
 package com.wangzan101.mika.core.model
 
+import com.wangzan101.mika.core.net.jsonObjectOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -33,10 +34,16 @@ object ModelHttp {
             status == 429 -> ModelError.RateLimited(HttpSupport.retryAfterMs(retryAfter, body))
             contextTooLong(status, body) -> ModelError.ContextTooLong()
             status == 404 -> ModelError.ModelNotFound(model, ModelAccessErrors.jsonDetail(body))
-            status in 500..599 -> ModelError.Server(status)
             status == 403 -> ModelError.Auth()
-            else -> if (status >= 400) ModelError.Server(status, ModelAccessErrors.detail(body)) else ModelError.BadResponse("HTTP $status ${body.take(200)}")
+            else -> fallback(status, body)
         }
+
+    /** Closing fallback when each vendor's error mapping cannot identify the cause: 5xx is a server error, other >= 400 carry the error detail, otherwise the reply cannot be read. */
+    fun fallback(status: Int, body: String): ModelError = when {
+        status in 500..599 -> ModelError.Server(status)
+        status >= 400 -> ModelError.Server(status, ModelAccessErrors.detail(body))
+        else -> ModelError.BadResponse("HTTP $status ${body.take(200)}")
+    }
 
     /** Error frames inside an HTTP 200 SSE stream are also classified like HTTP errors and handed to retry and failover. */
     fun streamError(root: JsonObject): ModelError? {
@@ -88,7 +95,7 @@ object ModelHttp {
 
     /** Error mapping for the native Gemini API. */
     fun geminiError(status: Int, retryAfter: String?, body: String, model: String): ModelError {
-        val err = try { json.parseToJsonElement(body).jsonObject["error"] as? JsonObject } catch (e: Exception) { null }
+        val err = json.jsonObjectOrNull(body)?.get("error") as? JsonObject
         val st = (err?.get("status") as? JsonPrimitive)?.contentOrNull.orEmpty()
         val msg = (err?.get("message") as? JsonPrimitive)?.contentOrNull ?: body
         val lower = msg.lowercase()
@@ -100,8 +107,7 @@ object ModelHttp {
             status == 404 -> ModelError.ModelNotFound(model, ModelAccessErrors.jsonDetail(body))
             status == 413 || (status == 400 && lower.contains("token") &&
                 (lower.contains("exceed") || lower.contains("too long") || lower.contains("maximum"))) -> ModelError.ContextTooLong()
-            status in 500..599 -> ModelError.Server(status)
-            else -> if (status >= 400) ModelError.Server(status, ModelAccessErrors.detail(body)) else ModelError.BadResponse("HTTP $status ${body.take(200)}")
+            else -> fallback(status, body)
         }
     }
 }

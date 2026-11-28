@@ -1,10 +1,9 @@
 package com.wangzan101.mika.core.run.record
 
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 /**
  * One summary ([RunMetrics]) per run, one per line in [file] (JSON Lines), keeping only the most recent [keep]; run records keep only the last 30 runs,
@@ -57,9 +56,7 @@ class RunMetricsStore(private val file: File, private val keep: Int = DEFAULT_KE
     private fun write(list: List<RunMetrics>) {
         runCatching {
             file.parentFile?.mkdirs()
-            val tmp = File(file.path + ".tmp")
-            tmp.writeText(list.takeLast(keep).joinToString("") { JSON.encodeToString(RunMetrics.serializer(), it) + "\n" })
-            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            AtomicFiles.write(file, list.takeLast(keep).joinToString("") { JSON.encodeToString(RunMetrics.serializer(), it) + "\n" }, durable = false)
         }
     }
 

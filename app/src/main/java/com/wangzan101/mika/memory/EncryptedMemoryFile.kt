@@ -3,6 +3,7 @@ package com.wangzan101.mika.memory
 import android.security.keystore.UserNotAuthenticatedException
 import com.wangzan101.mika.core.learn.memory.MemoryItem
 import com.wangzan101.mika.core.learn.memory.MemoryPersistence
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import com.wangzan101.mika.settings.KeyCipher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,13 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.io.FileOutputStream
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.security.KeyStoreException
 import java.security.ProviderException
-import java.text.SimpleDateFormat
-import java.util.Locale
 
 /**
  * Encrypts the entire memory into `memory/memory.bin` (AES-GCM; the key is supplied by the caller, production uses
@@ -61,9 +57,8 @@ class EncryptedMemoryFile(
     override fun save(items: List<MemoryItem>) {
         memDir.mkdirs()
         val bytes = cipher.encrypt(json.encodeToString(serializer, items).toByteArray(Charsets.UTF_8))
-        // Write to disk first, then rename: a power failure will not leave a renamed but empty file
-        FileOutputStream(tmp).use { it.write(bytes); it.fd.sync() }
-        Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        // Flush to disk before renaming: a power cut does not leave a renamed but empty file
+        AtomicFiles.write(file, bytes, durable = true, temp = tmp)
     }
 
     /** "Wipe everything": deletes the memory files (including the bad file moved aside). The key rebuild is done by the caller after deleting the alias. */
@@ -74,12 +69,7 @@ class EncryptedMemoryFile(
     }
 
     private fun moveAside() {
-        val stamp = SimpleDateFormat("yyyyMMddHHmmss", Locale.US).format(clock())
-        var target = File(memDir, "$FILE.broken-$stamp")
-        var n = 1
-        while (target.exists()) target = File(memDir, "$FILE.broken-$stamp-${n++}")
-        Files.move(file.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
-        _brokenNotice.value = target.name
+        _brokenNotice.value = AtomicFiles.quarantine(file, AtomicFiles.Quarantine.MoveBroken, now = clock())!!.name
     }
 
     private companion object {

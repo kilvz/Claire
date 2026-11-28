@@ -4,6 +4,7 @@ import com.wangzan101.mika.BuildConfig
 import com.wangzan101.mika.core.tool.PluginToolSpec
 import com.wangzan101.mika.core.learn.skills.PluginSkills
 import com.wangzan101.mika.core.tool.Risk
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -153,12 +154,8 @@ class PluginRegistry(
 
     private fun writeRegistry(records: List<PluginRecord>) {
         root.mkdirs()
-        val tmp = File(root, "$REGISTRY.tmp")
-        tmp.writeText(json.encodeToString(RegistryFile(plugins = records)))
-        if (!tmp.renameTo(file)) {
-            file.delete()
-            check(tmp.renameTo(file)) { "cannot write $REGISTRY" }
-        }
+        val ok = AtomicFiles.write(file, json.encodeToString(RegistryFile(plugins = records)), durable = false, move = AtomicFiles.Move.Rename, fallback = AtomicFiles.Fallback.DeleteAndRetry)
+        check(ok) { "cannot write $REGISTRY" }
     }
 
     @Serializable

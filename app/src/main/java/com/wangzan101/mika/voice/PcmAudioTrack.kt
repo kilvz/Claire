@@ -11,6 +11,29 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
+/** Minimum buffer size for 16-bit PCM output (bytes); ≤ 0 when the device does not support this format. */
+internal fun pcm16MinBuffer(sampleRate: Int, channelMask: Int = AudioFormat.CHANNEL_OUT_MONO): Int =
+    AudioTrack.getMinBufferSize(sampleRate, channelMask, AudioFormat.ENCODING_PCM_16BIT)
+
+/** 16-bit PCM playback track for streamed writes (not yet playing); build throws UnsupportedOperationException when the parameters are unsupported. */
+internal fun pcm16Track(
+    attributes: AudioAttributes,
+    sampleRate: Int,
+    bufferBytes: Int,
+    channelMask: Int = AudioFormat.CHANNEL_OUT_MONO,
+): AudioTrack = AudioTrack.Builder()
+    .setAudioAttributes(attributes)
+    .setAudioFormat(
+        AudioFormat.Builder()
+            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+            .setSampleRate(sampleRate)
+            .setChannelMask(channelMask)
+            .build(),
+    )
+    .setBufferSizeInBytes(bufferBytes)
+    .setTransferMode(AudioTrack.MODE_STREAM)
+    .build()
+
 /** Writes PCM16LE with backpressure and drains the final frames before release. */
 internal class PcmAudioTrack(
     attributes: AudioAttributes,
@@ -29,20 +52,9 @@ internal class PcmAudioTrack(
             2 -> AudioFormat.CHANNEL_OUT_STEREO
             else -> error("unsupported PCM channel count: $channels")
         }
-        val minBufferBytes = AudioTrack.getMinBufferSize(sampleRate, channelMask, AudioFormat.ENCODING_PCM_16BIT)
+        val minBufferBytes = pcm16MinBuffer(sampleRate, channelMask)
         check(minBufferBytes > 0) { "unsupported PCM format: $sampleRate Hz, $channels channels" }
-        val audioTrack = AudioTrack.Builder()
-            .setAudioAttributes(attributes)
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setSampleRate(sampleRate)
-                    .setChannelMask(channelMask)
-                    .build(),
-            )
-            .setBufferSizeInBytes(minBufferBytes)
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
+        val audioTrack = pcm16Track(attributes, sampleRate, minBufferBytes, channelMask)
         try {
             check(audioTrack.state == AudioTrack.STATE_INITIALIZED) { "cannot initialize PCM playback" }
             startFrames = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

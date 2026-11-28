@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.telecom.TelecomManager
+import com.wangzan101.mika.R
 import com.wangzan101.mika.calls.CallPlaybackTruncation
 import com.wangzan101.mika.calls.CallTaskBrief
 import com.wangzan101.mika.calls.VolcRealtimeClient
@@ -12,6 +13,8 @@ import com.wangzan101.mika.calls.VolcRealtimeCredentials
 import com.wangzan101.mika.calls.VolcRealtimeEvent
 import com.wangzan101.mika.calls.VolcRealtimeSession
 import com.wangzan101.mika.calls.VolcRealtimeProtocol
+import com.wangzan101.mika.i18n.AppLanguage
+import com.wangzan101.mika.i18n.tr
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -50,7 +53,7 @@ internal interface VoiceBriefingConnection {
     val playbackTruncation: CallPlaybackTruncation? get() = null
     val events: Flow<VolcRealtimeEvent>
     fun send(bytes: ByteArray): Boolean
-    fun greet(): Boolean
+    fun greet(text: String): Boolean
     suspend fun closeAndAwait()
 }
 
@@ -77,6 +80,10 @@ class VoiceBriefingController internal constructor(
     private val newAudio: () -> VoiceBriefingAudio,
     private val localGate: () -> Boolean,
     private val maxSessionMillis: Long = 180_000,
+    /** The language of the briefing conversation (the app UI language); null means the default. */
+    private val languageTag: () -> String? = { null },
+    /** The greeting the app speaks, following the UI language. */
+    private val greetingText: () -> String = { VoiceBriefingConversation.GREETING },
 ) : AutoCloseable {
     constructor(context: Context, scope: CoroutineScope, endpoint: String = VolcRealtimeProtocol.ENDPOINT) : this(
         scope,
@@ -87,6 +94,8 @@ class VoiceBriefingController internal constructor(
                 kotlin.runCatching { context.getSystemService(TelecomManager::class.java)?.isInCall == false }
                     .getOrDefault(false)
         },
+        languageTag = { AppLanguage.resolved(context).tag },
+        greetingText = { tr(R.string.calls_voice_briefing_greeting) },
     )
 
     private val mutable = MutableStateFlow(VoiceBriefingState())
@@ -106,15 +115,17 @@ class VoiceBriefingController internal constructor(
     ): Boolean {
         if (closed || operation != null) return false
         if (targetKey.isBlank() || !credentials.valid || !safeGate(canContinue)) {
-            mutable.value = VoiceBriefingState(message = "Check the number, the microphone permission and that the phone is idle, then try again")
+            mutable.value = VoiceBriefingState(message = "Check the number, microphone permission and that the phone is free, then try again")
             return false
         }
         val conversation = try { VoiceBriefingConversation(initialBrief) }
         catch (_: IllegalArgumentException) {
-            mutable.value = VoiceBriefingState(message = "The existing briefing cannot be saved completely; please edit it first")
+            mutable.value = VoiceBriefingState(message = "The existing briefing cannot be saved in full; please edit it first")
             return false
         }
         val token = ++generation
+        val languageTag = languageTag()
+        val greeting = greetingText()
         mutable.value = VoiceBriefingState(activity = VoiceBriefingActivity.CONNECTING, targetKey = targetKey)
         val job = scope.launch(start = CoroutineStart.LAZY) {
             var provider: VoiceBriefingConnection? = null
@@ -136,10 +147,8 @@ class VoiceBriefingController internal constructor(
                             }
                         }
                         try {
-                            val prompt = VoiceBriefingConversation.PROMPT + initialBrief?.let {
-                                "\nThe owner has already filled in this briefing; use it only as context for this call:\nGoal: ${it.goal}\n" +
-                                    "Required questions: ${it.questions.joinToString("; ")}\nBackground: ${it.context}\nLimits: ${it.constraints}"
-                            }.orEmpty()
+                            val prompt = VoiceBriefingConversation.promptFor(languageTag, greeting) +
+                                initialBrief?.let { VoiceBriefingConversation.briefContext(it, languageTag) }.orEmpty()
                             provider = connect(credentials, config.copy(systemPrompt = prompt, enablePhoneDtmf = false))
                             if (!valid()) throw VoiceBriefingFailure("The voice briefing has stopped; no call was placed")
                             localAudio = newAudio().also { audio = it }
@@ -150,7 +159,7 @@ class VoiceBriefingController internal constructor(
                                     this@coroutineScope.cancel(CancellationException("Local briefing audio ended"))
                                 },
                             )
-                            if (!valid() || !provider!!.greet()) throw VoiceBriefingFailure("The voice connection was interrupted; please try again")
+                            if (!valid() || !provider!!.greet(greeting)) throw VoiceBriefingFailure("The voice connection was interrupted; please try again")
                             mutable.value = mutable.value.copy(activity = VoiceBriefingActivity.LISTENING)
                             provider!!.events.firstOrNull { event ->
                                 if (!valid()) throw VoiceBriefingFailure("The voice briefing has stopped; no call was placed")
@@ -200,7 +209,7 @@ class VoiceBriefingController internal constructor(
                     }
                 }
             } catch (error: CancellationException) {
-                failure = if (token == generation) audioFailure.get() ?: "The voice briefing reached its time limit or was canceled; no call was placed" else null
+                failure = if (token == generation) audioFailure.get() ?: "The voice briefing reached its time limit or was cancelled; no call was placed" else null
             } catch (error: VoiceBriefingFailure) {
                 failure = error.safeMessage
             } catch (_: Exception) {
@@ -242,7 +251,7 @@ class VoiceBriefingController internal constructor(
                 operation = null
                 if (job.isCancelled) mutable.value = mutable.value.copy(
                     activity = VoiceBriefingActivity.IDLE,
-                    message = mutable.value.message ?: "The voice briefing was canceled; no call was placed",
+                    message = mutable.value.message ?: "The voice briefing was cancelled; no call was placed",
                 )
             }
         }
@@ -268,7 +277,7 @@ private class ProviderConnection(private val session: VolcRealtimeSession) : Voi
     override val playbackTruncation get() = session.playbackTruncation
     override val events get() = session.events
     override fun send(bytes: ByteArray) = session.sendPcm16(bytes)
-    override fun greet() = session.sendGreeting(VoiceBriefingConversation.GREETING)
+    override fun greet(text: String) = session.sendGreeting(text)
     override suspend fun closeAndAwait() {
         session.close()
         session.awaitClosed()

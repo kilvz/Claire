@@ -3,7 +3,7 @@ package com.wangzan101.mika.core.run
 import com.wangzan101.mika.core.action.ConfirmChoice
 
 /**
- * Channel inbound requests verify the owner, question ID and confirmation permission here; ordinary new messages always start a new task.
+ * Channel inbound requests verify the owner, question ID and confirmation permission here; ordinary new messages always start a new task, except stop commands ([ChannelCommands]).
  * When the user paused Claire ([paused]), a new message does not start a task and is not held for resume: acknowledge receipt first, then make a best effort to reply "paused" ([Route.paused]);
  * Even if the reply cannot be sent, the acknowledgement stands, the channel will not redeliver this message, and it will not start automatically after resuming; resend the request after resuming.
  */
@@ -21,6 +21,11 @@ class ChannelGateway(
         suspend fun confirm(threadId: String, askId: String, choice: ConfirmChoice): Boolean
         suspend fun stop(runId: RunId)
         suspend fun cancelAsk(threadId: String)
+        /**
+         * The owner sent a stop command ([ChannelCommands.isStop]): stop the running and queued tasks in this conversation, and reply if possible.
+         * Channels that do not support it still treat the message as a new task.
+         */
+        suspend fun stopThread(peer: ChannelPeer, messageId: String, text: String) = newTask(peer, messageId, text)
     }
 
     fun start(channel: Channel): AutoCloseable = channel.start(ChannelInputSink { input ->
@@ -33,6 +38,12 @@ class ChannelGateway(
                     try { route.paused(input.peer, input.messageId) }
                     catch (e: kotlinx.coroutines.CancellationException) { throw e }
                     catch (_: Exception) { }
+                    return@ChannelInputSink
+                }
+                // A stop command must not queue behind a stuck task (#861); an explicit reply to a Mika question is still handled as an answer
+                if (input.replyToAskId == null && ChannelCommands.isStop(input.text)) {
+                    route.stopThread(input.peer, input.messageId, input.text)
+                    channel.acknowledge(input.messageId)
                     return@ChannelInputSink
                 }
                 val ask = activeAsk(input.peer.threadId)

@@ -246,6 +246,8 @@ class TaskService : Service() {
                 ?.let { r -> if (center.cancelIfQueued(r)) cancelQueued(r) else r.cancel() }
             ACTION_CANCEL -> if (run != null && center.cancelIfQueued(run)) cancelQueued(run) else run?.cancel()
             ACTION_PAUSE_ALL -> stopForPause()
+            ACTION_STOP_CHANNEL_THREAD -> stopChannelThread(intent.getStringExtra(EXTRA_CHANNEL_ID).orEmpty(),
+                intent.getStringExtra(EXTRA_CONVERSATION).orEmpty())
             ACTION_RESUME -> run?.resume()
             ACTION_TAKE_OVER -> run?.takeOver(waitKeyOf(intent))
             ACTION_HAND_BACK -> run?.handBack(waitKeyOf(intent))
@@ -371,6 +373,7 @@ class TaskService : Service() {
         const val ACTION_CANCEL_MCP = "com.wangzan101.mika.task.CANCEL_MCP"
         const val ACTION_CANCEL = "com.wangzan101.mika.task.CANCEL"
         internal const val ACTION_PAUSE_ALL = "com.wangzan101.mika.task.PAUSE_ALL"
+        internal const val ACTION_STOP_CHANNEL_THREAD = "com.wangzan101.mika.task.STOP_CHANNEL_THREAD"
         const val ACTION_RESUME = "com.wangzan101.mika.task.RESUME"
         const val ACTION_TAKE_OVER = "com.wangzan101.mika.task.TAKE_OVER"
         const val ACTION_HAND_BACK = "com.wangzan101.mika.task.HAND_BACK"
@@ -554,6 +557,22 @@ class TaskService : Service() {
             app.followUpQueue.clear()
             if (app.taskState.runs.value.isEmpty()) return
             runCatching { context.startService(Intent(context, TaskService::class.java).setAction(ACTION_PAUSE_ALL)) }
+        }
+
+        /**
+         * The channel owner sent a stop command: stop the running and queued tasks and the not-yet-started queued messages in this channel conversation, returning how many were stopped (as of now).
+         * No task means the service is not started.
+         */
+        fun stopChannelThread(context: Context, peer: ChannelPeer): Int {
+            val app = context.applicationContext as? com.wangzan101.mika.MikaApp ?: return 0
+            val count = app.taskState.runs.value.count { it.channelPeer.sameThread(peer) } +
+                app.followUpQueue.pendingFor(peer.threadId).count { it.channelPeer.sameThread(peer) }
+            if (count == 0) return 0
+            runCatching {
+                context.startService(Intent(context, TaskService::class.java).setAction(ACTION_STOP_CHANNEL_THREAD)
+                    .putExtra(EXTRA_CHANNEL_ID, peer.channelId).putExtra(EXTRA_CONVERSATION, peer.threadId))
+            }.onFailure { return 0 }
+            return count
         }
 
         /** [runKey] see [send]; in-app buttons carry the task ID of the conversation on screen so they cannot land on another task. */

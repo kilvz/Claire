@@ -51,19 +51,22 @@ internal object CallPolicy {
     const val DEFAULT_SECONDS = 600
     const val MIN_SECONDS = 15
     const val MAX_SECONDS = 600
-    /** How long before the limit to inject the farewell (milliseconds): the farewell line is short, so this lead time is enough to say it and finish playing. */
+    /** How long before the limit the farewell is injected (milliseconds): the line is short, and this much lead is enough to say it and finish playing. */
     const val CLOSING_LEAD_MS = 15_000L
-    /** The line spoken on behalf of the AI when the time limit is reached; the closing sentence must be recognized by [CallFarewellPolicy.isAssistantClosing] so that a natural hang-up is used. */
-    const val CLOSING_LINE = "Okay, that's all for now. Let's leave it there."
+    /** Fallback closing line for JVM unit tests without Android Resources. */
+    const val CLOSING_LINE = "Our time is almost up, let's wrap up here. Goodbye."
 
-    /** Number of retries when the time-limit hang-up is not confirmed. */
+    fun closingLine(languageTag: String? = null): String =
+        runCatching { com.wangzan101.mika.i18n.tr(com.wangzan101.mika.R.string.calls_closing_line) }.getOrElse { CLOSING_LINE }
+
+    /** Retry count when the hang-up at the time limit is not confirmed. */
     const val HANGUP_ATTEMPTS = 3
 
-    /** 0 = no time limit; positive values are clamped to [MIN_SECONDS]..[MAX_SECONDS]. */
+    /** 0 = no time limit; a positive value is clamped to [MIN_SECONDS]..[MAX_SECONDS]. */
     fun clampCallSeconds(seconds: Int): Int =
         if (seconds <= 0) 0 else seconds.coerceIn(MIN_SECONDS, MAX_SECONDS)
 
-    /** Delay for injecting the farewell before the deadline; no farewell is scheduled when the duration is unlimited (null) or the remaining time is not even enough for the farewell. */
+    /** Delay before the limit at which the farewell is injected; null (no limit) or too little time left for even the farewell means none is scheduled. */
     fun closingDelayMs(remainingMs: Long?): Long? =
         remainingMs?.takeIf { it > CLOSING_LEAD_MS }?.minus(CLOSING_LEAD_MS)
 
@@ -165,14 +168,18 @@ internal object CallPolicy {
     const val DEFAULT_GREETING = IDENTITY_GREETING + " Do you have a message you'd like me to pass on?"
     const val TASK_GREETING = IDENTITY_GREETING + " Is this a good time to talk?"
 
+    /** Legacy defaults written in earlier versions are recognized so a stored copy can be replaced by today's default. */
     fun migrateDefaultGreeting(stored: String): String =
         if (stored == LEGACY_IDENTITY_GREETING + LEGACY_INCOMING_GREETING ||
             stored == LEGACY_IDENTITY_GREETING_V2 + LEGACY_INCOMING_GREETING) DEFAULT_GREETING else stored
 
-    fun spokenGreeting(configured: String, hasTask: Boolean): String {
+    /** The default greeting follows the app language through resources, falling back to the English constants when resources are unavailable (JVM tests). */
+    fun spokenGreeting(configured: String, hasTask: Boolean, languageTag: String? = null): String {
         if (configured.isBlank()) return ""
         val greeting = migrateDefaultGreeting(configured)
-        return if (hasTask && greeting == DEFAULT_GREETING) TASK_GREETING else greeting
+        if (greeting != DEFAULT_GREETING) return greeting
+        val res = if (hasTask) com.wangzan101.mika.R.string.calls_task_greeting else com.wangzan101.mika.R.string.calls_default_greeting
+        return runCatching { com.wangzan101.mika.i18n.tr(res) }.getOrElse { if (hasTask) TASK_GREETING else DEFAULT_GREETING }
     }
 
     fun prompt(
@@ -180,6 +187,7 @@ internal object CallPolicy {
         direction: CallDirection,
         ownerRules: String? = null,
         task: CallTaskBrief? = null,
+        @Suppress("UNUSED_PARAMETER") languageTag: String? = null,
     ): String = buildString {
         val outgoingTask = task.takeIf { direction == CallDirection.OUTGOING }
         append("This is a live phone call. The opening line is played separately by the app; once you have heard the other party, answer the current question directly, without greeting or introducing yourself again. Do not pretend to be the owner or a real person, and do not guess whether the owner is available right now.")

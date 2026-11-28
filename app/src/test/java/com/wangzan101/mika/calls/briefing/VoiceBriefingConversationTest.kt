@@ -86,4 +86,20 @@ class VoiceBriefingConversationTest {
             fail("must not save partial instructions as a complete task")
         } catch (_: VoiceBriefingFailure) { }
     }
+
+    @Test fun `authorizes on English completion phrase and provides English briefing prompt`() {
+        listOf("I'm done, make the call", "i am done, make the call.", "Done, make the call!", "I'm done. Make the call.").forEach {
+            assertTrue(it, VoiceBriefingAuthorization.matches(final(it)))
+        }
+        assertFalse(VoiceBriefingAuthorization.matches(final("I'm done, make the call").copy(isFinal = false)))
+        assertTrue(VoiceBriefingConversation.promptFor("en").contains("Speak concisely in English"))
+        assertTrue(VoiceBriefingConversation.promptFor("ja", "ご用件をどうぞ。").endsWith("Start by saying: ご用件をどうぞ。"))
+        assertFalse(VoiceBriefingAuthorization.matches(final("I'm not done. Make the call.")))
+        val brief = CallTaskBrief(goal = "Book a table", questions = listOf("Any window seat?"))
+        assertTrue(VoiceBriefingConversation.briefContext(brief, "en").startsWith("\nThe owner has already filled in"))
+        assertTrue(VoiceBriefingConversation.briefContext(brief, "zh-Hans").startsWith("\nThe owner has already filled in"))
+        val zhPrompt = VoiceBriefingConversation.promptFor("zh-CN")
+        assertTrue(zhPrompt.contains("Speak concisely in Chinese"))
+        assertNull(Regex("[\\u3000-\\u30ff\\u3400-\\u9fff\\uff00-\\uffef]").find(zhPrompt))
+    }
 }

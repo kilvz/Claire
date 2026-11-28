@@ -99,15 +99,15 @@ class TaskCenterState {
     val _runId = MutableStateFlow<String?>(null)
     val _sharedFiles = MutableStateFlow<List<SharedFile>>(emptyList())
     val sharedFiles: StateFlow<List<SharedFile>> = _sharedFiles.asStateFlow()
-    /** Audio generated so far by the displayed task; saved into the conversation with this turn when it ends. */
-    val _audios = MutableStateFlow<List<com.wangzan101.mika.core.chat.GeneratedAudio>>(emptyList())
-    val audios: StateFlow<List<com.wangzan101.mika.core.chat.GeneratedAudio>> = _audios.asStateFlow()
-    /** Images generated so far by the displayed task; saved into the conversation with this turn when it ends. */
-    val _photos = MutableStateFlow<List<com.wangzan101.mika.core.chat.GeneratedPhoto>>(emptyList())
-    val photos: StateFlow<List<com.wangzan101.mika.core.chat.GeneratedPhoto>> = _photos.asStateFlow()
-    /** Videos generated so far by the displayed task; saved into the conversation with this turn when it ends. */
-    val _videos = MutableStateFlow<List<com.wangzan101.mika.core.chat.GeneratedVideo>>(emptyList())
-    val videos: StateFlow<List<com.wangzan101.mika.core.chat.GeneratedVideo>> = _videos.asStateFlow()
+    /** Audio the displayed task has generated so far; stored with the turn when it ends. */
+    val _audios = MutableStateFlow<List<com.wangzan101.mika.core.agent.GeneratedAudio>>(emptyList())
+    val audios: StateFlow<List<com.wangzan101.mika.core.agent.GeneratedAudio>> = _audios.asStateFlow()
+    /** Images the displayed task has generated so far; stored with the turn when it ends. */
+    val _photos = MutableStateFlow<List<com.wangzan101.mika.core.agent.GeneratedPhoto>>(emptyList())
+    val photos: StateFlow<List<com.wangzan101.mika.core.agent.GeneratedPhoto>> = _photos.asStateFlow()
+    /** Video the displayed task has generated so far; stored with the turn when it ends. */
+    val _videos = MutableStateFlow<List<com.wangzan101.mika.core.agent.GeneratedVideo>>(emptyList())
+    val videos: StateFlow<List<com.wangzan101.mika.core.agent.GeneratedVideo>> = _videos.asStateFlow()
     val _endedRunId = MutableStateFlow<String?>(null)
     val endedRunId: StateFlow<String?> = _endedRunId.asStateFlow()
     val _endedRunIds = MutableStateFlow<Map<String, String?>>(emptyMap())

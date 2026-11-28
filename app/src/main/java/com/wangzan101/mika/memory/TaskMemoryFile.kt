@@ -3,6 +3,7 @@ package com.wangzan101.mika.memory
 import android.security.keystore.UserNotAuthenticatedException
 import com.wangzan101.mika.core.learn.memory.TaskMemory
 import com.wangzan101.mika.core.learn.memory.TaskMemoryPersistence
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import com.wangzan101.mika.settings.KeyCipher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,13 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.io.FileOutputStream
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.security.KeyStoreException
 import java.security.ProviderException
-import java.text.SimpleDateFormat
-import java.util.Locale
 
 /**
  * Encrypts cross-session task summaries into `task_memory/task_memory.bin` (AES-GCM; the key is supplied by the caller,
@@ -54,8 +50,7 @@ class TaskMemoryFile(
     override fun save(items: List<TaskMemory>) {
         memDir.mkdirs()
         val bytes = cipher.encrypt(json.encodeToString(serializer, items).toByteArray(Charsets.UTF_8))
-        FileOutputStream(tmp).use { it.write(bytes); it.fd.sync() }
-        Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        AtomicFiles.write(file, bytes, durable = true, temp = tmp)
     }
 
     /** "Wipe everything": deletes the task summary files (including the bad file moved aside). The key rebuild is done by the caller after deleting the alias. */
@@ -65,11 +60,7 @@ class TaskMemoryFile(
     }
 
     private fun moveAside() {
-        val stamp = SimpleDateFormat("yyyyMMddHHmmss", Locale.US).format(clock())
-        var target = File(memDir, "$FILE.broken-$stamp")
-        var n = 1
-        while (target.exists()) target = File(memDir, "$FILE.broken-$stamp-${n++}")
-        Files.move(file.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        AtomicFiles.quarantine(file, AtomicFiles.Quarantine.MoveBroken, now = clock())
     }
 
     private companion object {

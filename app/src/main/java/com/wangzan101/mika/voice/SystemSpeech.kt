@@ -69,7 +69,9 @@ object SystemSpeech {
 
     /**
      * Which kind of failure a recognition service error code maps to; null means "no speech heard in this segment" (no match, nothing spoken), so reopen while holding and return the existing text after release.
-     * Codes outside the list (server errors, unsupported language, etc.) are treated as the service having a problem.
+     * Codes outside the list (server errors, unsupported language, vendor-specific codes and the like) are treated as the service having a problem.
+     * These errors are only reported after the service is registered and recognition has started, so they must not be described as "this phone has no built-in recognition":
+     * that is the verdict of the capability check ([capability]), which the settings page shows as available at the same time, and the two must agree (#795).
      */
     fun failureOf(code: Int): SpeechFailure? = when (code) {
         SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> null
@@ -79,8 +81,14 @@ object SystemSpeech {
         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> SpeechFailure.NoPermission
         SpeechRecognizer.ERROR_AUDIO -> SpeechFailure.AudioError
         SpeechRecognizer.ERROR_CLIENT -> SpeechFailure.Unavailable(SpeechEngineSpec.Why.SystemFailed)
-        else -> SpeechFailure.Unavailable(SpeechEngineSpec.Why.SystemGone)
+        else -> SpeechFailure.Unavailable(SpeechEngineSpec.Why.SystemFailed)
     }
+
+    /**
+     * Whether on-device recognition should fall back to online recognition when it reports this code having heard nothing yet: services that failed themselves fall back (an on-device model not ready,
+     * a request it does not accept and the like); network, busy, permission and microphone errors would fail the same with another service, so they do not, and "nothing heard" reopens as usual.
+     */
+    fun onDeviceFallsBack(code: Int): Boolean = failureOf(code) is SpeechFailure.Unavailable
 
     /** What to do once an error code arrives: reopen, wrap up with what was heard, or report a failure. */
     sealed interface Outcome {
@@ -489,6 +497,12 @@ class SystemSpeechSession(
             if (!retag()) toOnline()
             return
         }
+        if (usingOnDevice && holding && segments.full().isEmpty() && SystemSpeech.onDeviceFallsBack(error)) {
+            android.util.Log.i(TAG, "on-device recognition failed with code $error; trying online recognition")
+            heard(remember = false)
+            toOnline()
+            return
+        }
         val outcome = SystemSpeech.afterError(error, holding, heard = segments.full().isNotEmpty(),
             canTryNext = attempt + 1 < attempts.size)
         if (outcome == SystemSpeech.Outcome.NextService) {
@@ -694,6 +708,8 @@ class SystemSpeechSession(
     }
 
     companion object {
+        private const val TAG = "ClaireSystemSpeech"
+
         /** Upper bound for waiting for the final result after release. */
         const val FINAL_WAIT_MS = 2_000L
 

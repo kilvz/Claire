@@ -6,10 +6,11 @@ import com.wangzan101.mika.core.run.record.RunMetricsStore
 import com.wangzan101.mika.core.model.usage.ConversationMeter
 import com.wangzan101.mika.core.model.usage.ConversationUsage
 import com.wangzan101.mika.core.agent.Turn
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import com.wangzan101.mika.settings.ModelChoice
 import com.wangzan101.mika.settings.PersonaStore
-import com.wangzan101.mika.core.chat.GeneratedAudio
-import com.wangzan101.mika.core.chat.GeneratedPhoto
+import com.wangzan101.mika.core.agent.GeneratedAudio
+import com.wangzan101.mika.core.agent.GeneratedPhoto
 import com.wangzan101.mika.core.learn.memory.MemoryNote
 import com.wangzan101.mika.core.learn.memory.NoteKind
 import com.wangzan101.mika.core.learn.skills.SkillNote
@@ -40,7 +41,6 @@ import kotlinx.serialization.json.put
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.nio.file.LinkOption
 import java.util.UUID
 
@@ -98,10 +98,7 @@ class ConversationStore(
         val next = change(old)
         if (old == next) return false
         dir.mkdirs()
-        val dest = usageFile(id)
-        val tmp = File(dir, "${dest.name}.tmp")
-        tmp.writeText(usageJson.encodeToString(ConversationUsage.serializer(), next))
-        Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        AtomicFiles.write(usageFile(id), usageJson.encodeToString(ConversationUsage.serializer(), next), durable = false)
         return true
     }
 
@@ -466,13 +463,8 @@ class ConversationStore(
             })
         }
         dir.mkdirs()
-        val tmp = File(dir, "${f.name}.tmp")
         val ok = runCatching {
-            tmp.writeText(json.toString())
-            if (!tmp.renameTo(f)) {
-                f.writeText(json.toString())
-                tmp.delete()
-            }
+            AtomicFiles.write(f, json.toString(), durable = false, move = AtomicFiles.Move.Rename, fallback = AtomicFiles.Fallback.WriteDirect)
         }.isSuccess
         if (ok) _changes.tryEmit(conversationId)
         return ok
@@ -527,17 +519,8 @@ class ConversationStore(
         }
         if (!ProjectStore.isValidId(projectId)) return false
         dir.mkdirs()
-        val tmp = File(dir, "${f.name}.tmp")
         val ok = runCatching {
-            tmp.writeText(projectId)
-            try {
-                Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-            } catch (_: Exception) {
-                if (!tmp.renameTo(f)) {
-                    f.writeText(projectId)
-                    tmp.delete()
-                }
-            }
+            AtomicFiles.write(f, projectId, durable = false, move = AtomicFiles.Move.AtomicThenRename, fallback = AtomicFiles.Fallback.WriteDirect)
         }.isSuccess
         if (ok) _changes.tryEmit(conversationId)
         return ok
@@ -629,9 +612,7 @@ class ConversationStore(
                         })
                     }
                 }
-                val tmp = File(dir, "${f.name}.tmp")
-                tmp.writeText(json.toString())
-                Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                AtomicFiles.write(f, json.toString(), durable = false)
                 true
             }
         }.getOrDefault(false)
@@ -706,14 +687,9 @@ class ConversationStore(
         val json = buildJsonObject {
             put("parent", origin.parentId); put("turn", origin.parentTurn); put("after", origin.afterTurn); put("at", origin.at)
         }
-        val f = branchFile(conversationId)
-        val tmp = File(dir, "${f.name}.tmp")
         runCatching {
-            tmp.writeText(json.toString())
-            if (!tmp.renameTo(f)) {
-                f.writeText(json.toString())
-                tmp.delete()
-            }
+            AtomicFiles.write(branchFile(conversationId), json.toString(), durable = false,
+                move = AtomicFiles.Move.Rename, fallback = AtomicFiles.Fallback.WriteDirect)
         }
     }
 
@@ -736,11 +712,8 @@ class ConversationStore(
         if (safe(conversationId) in deleted) return
         val next = calls(conversationId).upsert(call)
         dir.mkdirs()
-        val dest = callsFile(conversationId)
-        val tmp = File(dir, "${dest.name}.tmp")
         val ok = runCatching {
-            tmp.writeText(callsJson.encodeToString(ListSerializer(ConversationCall.serializer()), next))
-            Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            AtomicFiles.write(callsFile(conversationId), callsJson.encodeToString(ListSerializer(ConversationCall.serializer()), next), durable = false)
         }.isSuccess
         if (ok) _changes.tryEmit(conversationId)
     }
@@ -842,9 +815,9 @@ class ConversationStore(
         return GeneratedPhoto(path, str(o, "width")?.toIntOrNull() ?: 0, str(o, "height")?.toIntOrNull() ?: 0, str(o, "prompt"), str(o, "atMs")?.toLongOrNull())
     }
 
-    private fun videoOf(o: JsonObject): com.wangzan101.mika.core.chat.GeneratedVideo? {
+    private fun videoOf(o: JsonObject): com.wangzan101.mika.core.agent.GeneratedVideo? {
         val path = str(o, "path") ?: return null
-        return com.wangzan101.mika.core.chat.GeneratedVideo(
+        return com.wangzan101.mika.core.agent.GeneratedVideo(
             path,
             str(o, "durationMs")?.toLongOrNull(),
             str(o, "width")?.toIntOrNull() ?: 0,
@@ -863,12 +836,24 @@ class ConversationStore(
         val f = file(conversationId)
         val prior = if (f.isFile) read(f) else emptyList()
         if (prior == null) {
-            // Move the corrupted file aside and keep it rather than overwriting it with the new content
-            f.renameTo(File(dir, "${f.name}.corrupt-${System.currentTimeMillis()}"))
+            // Move a corrupted file aside and keep it; never overwrite it with new content
+            AtomicFiles.quarantine(f, AtomicFiles.Quarantine.RenameCorrupt, dedupe = false)
         }
-        // A new turn records when it was stored; ones that already carry a timestamp (branch copies, restores) keep it as is
+        // A new turn records when it was stored; a turn with its own timestamp keeps it as is
         val stored = if (turn.atMs == null) turn.copy(atMs = clock()) else turn
-        write(conversationId, prior.orEmpty() + (stored to files))
+        write(conversationId, insertByTime(prior.orEmpty(), stored to files))
+    }
+
+    /**
+     * Inserts into the conversation by the time it was spoken: after the last turn no later than it, with same-time turns ordered by when they were stored.
+     * An ordinary turn (timestamped now) still appends at the end; a late turn (a call turn written when the call hangs up, a chat reply written when it finishes)
+     * goes back to where it was spoken instead of landing after task reports written in the meantime. Old records without a timestamp do not block a position.
+     */
+    private fun insertByTime(records: List<Pair<Turn, List<SharedFile>>>, record: Pair<Turn, List<SharedFile>>): List<Pair<Turn, List<SharedFile>>> {
+        val at = record.first.atMs ?: return records + record
+        val after = records.indexOfLast { (it.first.atMs ?: Long.MIN_VALUE) <= at }
+        if (after == records.lastIndex) return records + record
+        return records.take(after + 1) + record + records.drop(after + 1)
     }
 
     /** Changes the turn whose run id is [runId] (adding the decided outcome and the memory and skill notes after the task ends); does nothing when not found. */
@@ -951,13 +936,9 @@ class ConversationStore(
                 }))
             }
         })
-        // Write the temporary file first and then rename, so being killed halfway leaves no half file
-        val tmp = File(dir, "${file(conversationId).name}.tmp")
-        tmp.writeText(json.toString())
-        if (!tmp.renameTo(file(conversationId))) {
-            file(conversationId).writeText(json.toString())
-            tmp.delete()
-        }
+        // Write a temp file first, then rename it, so a kill halfway through does not leave half a file
+        AtomicFiles.write(file(conversationId), json.toString(), durable = false,
+            move = AtomicFiles.Move.Rename, fallback = AtomicFiles.Fallback.WriteDirect)
         firstMessages.remove(file(conversationId).name)
         _changes.tryEmit(conversationId)
     }

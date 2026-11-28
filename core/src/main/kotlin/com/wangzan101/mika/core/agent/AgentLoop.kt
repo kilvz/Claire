@@ -1,5 +1,6 @@
 package com.wangzan101.mika.core.agent
 
+import com.wangzan101.mika.core.tool.fail
 import com.wangzan101.mika.core.run.trace.RunTrace
 import com.wangzan101.mika.core.safety.guard.OperationGuards
 import com.wangzan101.mika.core.safety.guard.GuardVerdict
@@ -705,9 +706,7 @@ class AgentLoop(
 
             // The step the user just approved must be done on its own: steps in a batch carry no consent, so mixing it in would be stopped by the gate, and the consent could also be consumed or invalidated by other steps
             if (((flags.batchSteps && first.name == DO_STEPS_TOOL) || tools.composite(first.name)) && confirmations?.hasGrant == true) {
-                val content = buildJsonObject {
-                    put("ok", false); put("error", "approved_step_first"); put("message", APPROVED_STEP_FIRST); put("recoverable", true)
-                }
+                val content = fail("approved_step_first", APPROVED_STEP_FIRST).content
                 history += calls.results(Part.ToolResult(first.id, content.toString(), isError = true))
                 recordReply(if (first.name == DO_STEPS_TOOL) BatchRunner.redactArgs(first.argsJson) else Redactor.args(tools.verb(first.name), first.argsJson, secretField = true))
                 recorder.result(step, first.name, tools.verb(first.name), content, JsonObject(emptyMap()), null, null, 0, "model", first.id)

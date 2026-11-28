@@ -24,6 +24,8 @@ data class VolcRealtimeConfig(
     val protocol: CallVoiceProtocol = CallVoiceProtocol.VOLC_DUPLEX,
     /** With [agentTools], the persona used for the front desk note (nickname and persona layer), the same one as in chat. */
     val deskPersona: DeskPersona = DeskPersona(),
+    /** The language used for the phone tool description when [enablePhoneDtmf] is set, matching the call prompt; the fork speaks English only, so the tag is informational. */
+    val languageTag: String? = null,
 ) {
     init {
         require(systemPrompt.length <= MAX_PROMPT_CHARS) { "Realtime system prompt is too long" }
@@ -117,34 +119,37 @@ internal object VolcRealtimeProtocol {
     fun enableTools(eventId: String, config: VolcRealtimeConfig): String = message("session.update", eventId) {
         putJsonObject("session") {
             put("tools", JsonArray(mutableListOf<kotlinx.serialization.json.JsonElement>().apply {
-                if (config.enablePhoneDtmf) addAll(phoneCallTools())
+                if (config.enablePhoneDtmf) addAll(phoneCallTools(config.languageTag))
                 if (config.agentTools) addAll(DeskTools.specs(DeskToolSet.User))
             }))
         }
     }
 
-    fun phoneTools() = JsonArray(listOf(buildJsonObject {
-        put("type", "function")
-        put("name", DTMF_FUNCTION)
-        put("description", "When a phone voice menu explicitly asks you to press a key, send the real phone DTMF keypresses; saying the digits out loud does not replace pressing them. Choose only according to this task and the menu you heard; never guess passwords or verification codes. Wait for the tool result, and never claim a keypress succeeded when it failed.")
-        putJsonObject("parameters") {
-            put("type", "object")
-            putJsonObject("properties") {
-                putJsonObject("digits") {
-                    put("type", "string")
-                    put("pattern", "^[0-9*#]{1,32}$")
-                    put("minLength", 1)
-                    put("maxLength", MAX_DTMF_DIGITS)
-                    put("description", "Phone keypresses to send in order; only 0-9, * and #, at most 32.")
+    /** Keypad tool; its description stays English because the realtime model reads it, whatever language the call is in. */
+    fun phoneTools(languageTag: String? = null): JsonArray {
+        return JsonArray(listOf(buildJsonObject {
+            put("type", "function")
+            put("name", DTMF_FUNCTION)
+            put("description", "Send real telephone DTMF keypad tones when an automated phone menu explicitly asks for keypad input; speaking digits aloud cannot replace keypad tones. Only choose options matching the current task and heard menu, never guess passwords or verification codes, and wait for the tool result without claiming success on failure.")
+            putJsonObject("parameters") {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("digits") {
+                        put("type", "string")
+                        put("pattern", "^[0-9*#]{1,32}$")
+                        put("minLength", 1)
+                        put("maxLength", MAX_DTMF_DIGITS)
+                        put("description", "Sequential telephone keypad digits to send; only 0-9, *, and # are allowed, up to 32 characters.")
+                    }
                 }
+                put("required", JsonArray(listOf(JsonPrimitive("digits"))))
+                put("additionalProperties", false)
             }
-            put("required", JsonArray(listOf(JsonPrimitive("digits"))))
-            put("additionalProperties", false)
-        }
-    }))
+        }))
+    }
 
-    /** The full tool set for carrier calls: keypad + phone front desk (asking the owner only). */
-    fun phoneCallTools() = JsonArray(phoneTools() + DeskTools.specs(DeskToolSet.Phone))
+    /** The full tool set for carrier calls: keypad plus the phone front desk (which only has ask-the-owner). */
+    fun phoneCallTools(languageTag: String? = null) = JsonArray(phoneTools(languageTag) + DeskTools.specs(DeskToolSet.Phone))
 
     fun toolResults(eventId: String, results: List<Pair<String, JsonObject>>): String =
         message("conversation.item.create", eventId) {

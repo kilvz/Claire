@@ -78,6 +78,36 @@ internal fun TaskService.stopForPause() {
 }
 
 /**
+ * The channel owner sent a stop command (#861): stop the running and queued tasks in this channel conversation. Only tasks in the same channel and conversation are touched;
+ * tasks on the phone, handed over by a computer, or in other conversations are left alone; a task waiting for the user on the phone goes through cancellation teardown as usual.
+ */
+internal fun TaskService.stopChannelThread(channelId: String, threadId: String) {
+    for (run in center.runs()) {
+        val peer = run.channelPeer ?: continue
+        if (peer.channelId != channelId || peer.threadId != threadId) continue
+        if (center.cancelIfQueued(run)) cancelQueued(run) else run.cancel()
+    }
+    // Also drop same-conversation messages queued behind a stuck task, or they would start running after the stop
+    for (item in center.followUps.pendingFor(threadId)) {
+        if (item.channelPeer?.channelId == channelId) center.followUps.cancel(item.id)
+    }
+}
+
+internal fun ChannelPeer?.sameThread(peer: ChannelPeer) =
+    this != null && channelId == peer.channelId && threadId == peer.threadId
+
+/** The stop reply: say how many were stopped, or say honestly that there was none. Sent through the reliable delivery ledger, replying only once per command; if it cannot be sent, so be it. */
+internal suspend fun replyStopped(outbox: Outbox, channel: Channel, peer: ChannelPeer, messageId: String, stopped: Int) {
+    val text = if (stopped > 0) tr(R.string.channel_stop_reply, stopped) else tr(R.string.channel_stop_none)
+    try {
+        outbox.deliver(channel, peer, Delivery.Notice("stopped:${peer.channelId}:$messageId", peer.threadId, text))
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+    }
+}
+
+/**
  * New channel messages during a pause (the caller has acknowledged receipt): make a best-effort reply "Claire is paused, this one was not started". Sent through the reliable delivery ledger,
  * replying only once per message; if it cannot be sent, so be it: do not let it block acknowledgment or make the channel redeliver.
  */

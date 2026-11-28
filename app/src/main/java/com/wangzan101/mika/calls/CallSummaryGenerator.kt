@@ -20,6 +20,7 @@ internal object CallSummaryGenerator {
         model: ChatModel,
         transcript: List<CallTranscriptLine>,
         direction: CallDirection = CallDirection.INCOMING,
+        languageTag: String? = null,
         canSend: () -> Boolean = { true },
     ): CallSummary? {
         val otherParty = if (direction == CallDirection.OUTGOING) "callee" else "caller"

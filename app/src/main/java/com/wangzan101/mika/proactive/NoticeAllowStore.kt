@@ -1,8 +1,7 @@
 package com.wangzan101.mika.proactive
 
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -72,13 +71,8 @@ class NoticeAllowStore(private val file: File) {
                 put("version", 1)
                 put("allowed", JsonArray(next.sorted().map(::JsonPrimitive)))
             }
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            // Flush to disk before replacing: a power cut never leaves an empty file in place of the original list
-            java.io.FileOutputStream(tmp).use { out ->
-                out.write(json.toString().toByteArray(Charsets.UTF_8))
-                out.fd.sync()
-            }
-            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            // Flush to disk before replacing: a power cut does not leave an empty file in place of the old list
+            AtomicFiles.write(file, json.toString(), durable = true)
         } catch (e: java.io.IOException) {
             return false
         } catch (e: SecurityException) {

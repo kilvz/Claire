@@ -1,5 +1,6 @@
 package com.wangzan101.mika.cap.sandbox
 
+import com.wangzan101.mika.cap.OutputCollector
 import com.wangzan101.mika.core.net.LocalHosts
 import com.wangzan101.mika.core.workspace.SandboxPaths
 import java.io.File
@@ -15,7 +16,6 @@ internal class ProcOutcome(val exitCode: Int, val output: ByteArray, val dropped
 /** Builds the launcher + PRoot command line and environment variables. */
 object ProcRunner {
     const val OUTPUT_LIMIT = 1 shl 20
-    const val READ_CHUNK = 64 * 1024
     const val PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     /** When going through a proxy, loopback and LAN addresses still connect directly (the same set as Claire's own connections, see [LocalHosts]). */
     const val NO_PROXY = LocalHosts.NO_PROXY
@@ -125,25 +125,4 @@ object ProcRunner {
     /** Reads to end of stream; the result is in [OutputCollector]. */
     internal fun collect(input: InputStream, limit: Int = OUTPUT_LIMIT): Pair<ByteArray, Long> =
         OutputCollector(limit).apply { drain(input) }.snapshot()
-}
-
-/** Reads to end of stream; keeps at most [limit] bytes, reading and discarding the excess while counting it (the command would block writing output otherwise). A snapshot can be taken while reading. */
-internal class OutputCollector(private val limit: Int = ProcRunner.OUTPUT_LIMIT) {
-    private val kept = java.io.ByteArrayOutputStream(minOf(limit, ProcRunner.READ_CHUNK))
-    private var dropped = 0L
-
-    fun drain(input: InputStream) {
-        val buf = ByteArray(ProcRunner.READ_CHUNK)
-        while (true) {
-            val n = input.read(buf)
-            if (n < 0) break
-            synchronized(this) {
-                val room = limit - kept.size()
-                if (room > 0) kept.write(buf, 0, minOf(n, room))
-                if (n > room) dropped += n - maxOf(room, 0)
-            }
-        }
-    }
-
-    @Synchronized fun snapshot(): Pair<ByteArray, Long> = kept.toByteArray() to dropped
 }

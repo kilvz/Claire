@@ -5,6 +5,8 @@ import com.wangzan101.mika.chat.CurrentChat
 import com.wangzan101.mika.chat.DeleteBatch
 import com.wangzan101.mika.chat.SharedDraft
 import com.wangzan101.mika.chat.SharedDraftAttachment
+import com.wangzan101.mika.chat.SharedFile
+import com.wangzan101.mika.core.agent.Turn
 import com.wangzan101.mika.memory.RunNotes
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -178,9 +180,16 @@ internal class ChatSession(private val vm: ChatViewModel) {
         else -> p.copy(closed = false)
     }
 
-    /** The turns stored for this conversation, together with the files each turn exported and the current memory and skill notes. */
-    fun saved(conversationId: String): List<Exchange> =
-        runCatching { store.records(conversationId) }.getOrDefault(emptyList()).map { (t, files) -> withSummarizing(withNotes(fromTurn(t).copy(files = files), runNotes.value)) }
+    /** The turns stored for this conversation, along with per-turn exported files and the current memory and skill hints. */
+    fun saved(conversationId: String): List<Exchange> = saved(savedRecords(conversationId))
+
+    /** Reads and parses the turns stored for this conversation; safe to call on a background thread (parsing the whole conversation JSON should not occupy the main thread). */
+    fun savedRecords(conversationId: String): List<Pair<Turn, List<SharedFile>>> =
+        runCatching { store.records(conversationId) }.getOrDefault(emptyList())
+
+    /** Turns the read turns into on-screen entries, pairing them with the current memory notes and summary state; call on the main thread. */
+    fun saved(records: List<Pair<Turn, List<SharedFile>>>): List<Exchange> =
+        records.map { (t, files) -> withSummarizing(withNotes(fromTurn(t).copy(files = files), runNotes.value)) }
 
     /** Project id saved for this conversation; falls back to null when the project does not exist. */
     fun projectFor(conversationId: String?): String? =

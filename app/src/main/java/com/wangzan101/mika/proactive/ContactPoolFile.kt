@@ -1,14 +1,10 @@
 package com.wangzan101.mika.proactive
 
 import com.wangzan101.mika.core.proactive.ContactPoolData
+import com.wangzan101.mika.core.workspace.AtomicFiles
 import com.wangzan101.mika.settings.KeyCipher
 import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
-import java.text.SimpleDateFormat
-import java.util.Locale
 
 /**
  * Summarized contacts, encrypted in their entirety into `proactive/contacts.bin` (AES-GCM, production uses
@@ -42,8 +38,7 @@ class ContactPoolFile(dir: File, private val cipher: KeyCipher, private val cloc
     override fun save(data: ContactPoolData) {
         poolDir.mkdirs()
         val bytes = cipher.encrypt(StoreCodec.write(ContactPoolData.serializer(), data, VERSION))
-        FileOutputStream(tmp).use { it.write(bytes); it.fd.sync() }
-        Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        AtomicFiles.write(file, bytes, durable = true, temp = tmp)
     }
 
     /** Deletes the old files that were moved aside (`$FILE.broken-…`). */
@@ -65,11 +60,7 @@ class ContactPoolFile(dir: File, private val cipher: KeyCipher, private val cloc
     }
 
     private fun moveAside() {
-        val stamp = SimpleDateFormat("yyyyMMddHHmmss", Locale.US).format(clock())
-        var target = File(poolDir, "$FILE.broken-$stamp")
-        var n = 1
-        while (target.exists()) target = File(poolDir, "$FILE.broken-$stamp-${n++}")
-        Files.move(file.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        AtomicFiles.quarantine(file, AtomicFiles.Quarantine.MoveBroken, now = clock())
     }
 
     companion object {
