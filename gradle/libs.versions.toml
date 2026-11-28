@@ -23,11 +23,12 @@ mlkitBarcodeScanning = "17.3.0"
 camerax = "1.4.2"
 zxing = "3.5.3"
 shizuku = "13.1.5"
-sherpaOnnx = "v2.0.1"
+otelProto = "1.11.1-alpha"
+protobufPlugin = "0.9.5"
 
 [libraries]
 protobuf-lite = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobuf" }
-otel-proto = { module = "io.opentelemetry.proto:opentelemetry-proto", version = "1.11.1-alpha" }
+otel-proto = { module = "io.opentelemetry.proto:opentelemetry-proto", version.ref = "otelProto" }
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
 compose-material3 = { module = "androidx.compose.material3:material3" }
 compose-ui = { module = "androidx.compose.ui:ui" }
@@ -61,13 +62,11 @@ camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "cam
 camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
 shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
-sherpa-onnx = { module = "com.github.k2-fsa.sherpa-onnx:sherpa-onnx", version.ref = "sherpaOnnx" }
 
 [plugins]
-protobuf = { id = "com.google.protobuf", version = "0.9.5" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

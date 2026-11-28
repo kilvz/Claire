@@ -1,19 +1,15 @@
 package com.wangzan101.mika.about
 
 import android.net.Network
-import kotlinx.coroutines.CancellationException
+import com.wangzan101.mika.download.DownloadFile
+import com.wangzan101.mika.download.VerifiedDownload
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.launch
 import okhttp3.Call
 import okhttp3.ConnectionPool
 import okhttp3.Dns
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.io.File
 import java.io.IOException
 import java.net.InetAddress
@@ -22,22 +18,19 @@ import java.net.ProxySelector
 import java.net.SocketAddress
 import java.net.URI
 import javax.net.SocketFactory
-import kotlin.coroutines.coroutineContext
 
 /**
- * In-app update download, used for automatic downloads bound to Wi-Fi and for manual downloads going through the app proxy.
- * It writes to `<target>.part` first and renames to the target file only once complete, so "the target file exists" means it is done.
- * There is only one per process (one download at a time); if the process is killed, an unfinished download counts as failed and the user can retry.
+ * 应用内更新下载,用于绑定 Wi-Fi 的自动下载以及使用应用代理的手动下载。
+ * 是 [VerifiedDownload] 上固定一个任务 key 的薄包装:先写到 `<目标>.part`,下完整了再改名成目标文件,
+ * 所以「目标文件在」就是下好了。进程里只有一份(同一时间只下一个,`start` 会取消上一个);
+ * 进程被杀后没下完的算失败,用户重试即可。语音包等别的下载用别的 key,和它互不取消。
  */
 class ProxiedApkDownload(
     private val http: OkHttpClient,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
-    @Volatile private var job: Job? = null
-    @Volatile private var call: Call? = null
+    private val downloads = VerifiedDownload(http, scope)
     @Volatile private var target: File? = null
-    @Volatile private var bytes = 0L
-    @Volatile private var total = -1L
 
     /**
      * Downloads the [sources] in order, moving to the next one when one fails; every source must pass [verify] (size, digest) after
@@ -54,69 +47,39 @@ class ProxiedApkDownload(
         require(sources.isNotEmpty()) { "no download source" }
         cancel()
         target = file
-        bytes = 0
-        total = -1
-        // Use Wi-Fi's own DNS and sockets: once it disconnects, connections fail instead of falling back to mobile data and continuing the download.
+        // 使用 Wi-Fi 自己的 DNS 和 socket，断开后连接失败，不会切到移动数据继续下载。
         val client = wifi?.let { network ->
             wifiBoundClient(http, network.socketFactory, object : Dns {
                 override fun lookup(hostname: String): List<InetAddress> = network.getAllByName(hostname).toList()
             })
-        } ?: http
-        val download = scope.launch(start = CoroutineStart.LAZY) {
-            val current = coroutineContext[Job]!!
-            for (url in sources) {
-                coroutineContext.ensureActive()
-                synchronized(this@ProxiedApkDownload) {
-                    if (job === current) { bytes = 0; total = -1 }
-                }
-                try {
-                    fetch(client, url, file, onCall = { next ->
-                        synchronized(this@ProxiedApkDownload) {
-                            if (job === current && current.isActive) call = next else next.cancel()
-                        }
-                    }) { done, size ->
-                        synchronized(this@ProxiedApkDownload) {
-                            if (job === current) { bytes = done; total = size }
-                        }
-                    }
-                    coroutineContext.ensureActive()
-                    verify(file)
-                    coroutineContext.ensureActive()
-                    return@launch
-                } catch (e: CancellationException) {
-                    file.delete()
-                    throw e
-                } catch (_: Exception) {
-                    // A connection exception caused by cancellation must not trigger the next source.
-                    file.delete()
-                    coroutineContext.ensureActive()
-                }
-            }
         }
-        job = download
-        download.start()
+        // 更新包总是重下:原来的做法是覆盖或删掉同名文件,不像语音包那样跳过已校验过的。
+        file.delete()
+        downloads.start(KEY, listOf(DownloadFile(file, sources, verify)), client)
     }
 
     /** State of this [file]: downloading, downloaded, or failed (not downloading and no complete file). */
     @Synchronized
-    fun state(file: File): ApkDownloadState = when {
-        job?.isActive == true && target == file -> ApkDownloadState(DownloadPhase.Downloading, bytes, total)
-        file.isFile -> ApkDownloadState(DownloadPhase.Ready, file.length(), file.length())
-        else -> ApkDownloadState(DownloadPhase.Failed)
+    fun state(file: File): ApkDownloadState {
+        val progress = downloads.progress(KEY).value
+        return when {
+            progress.phase == DownloadPhase.Downloading && target == file ->
+                ApkDownloadState(DownloadPhase.Downloading, progress.doneBytes, progress.totalBytes)
+            file.isFile -> ApkDownloadState(DownloadPhase.Ready, file.length(), file.length())
+            else -> ApkDownloadState(DownloadPhase.Failed)
+        }
     }
 
     @Synchronized
     fun cancel() {
-        job?.cancel()
-        // Cut the connection as well instead of waiting for this chunk to finish reading
-        call?.cancel()
-        job = null
-        call = null
+        // 连带掐断连接,不等读完这一块
+        downloads.cancel(KEY)
         target?.let { File(it.path + PART).delete() }
     }
 
     companion object {
         private const val PART = ".part"
+        private const val KEY = "app-update"
 
         /** Chooses the proxy per target on every route (including redirects), forbidding SOCKS that would bypass the Wi-Fi socket factory. */
         internal fun wifiBoundClient(http: OkHttpClient, sockets: SocketFactory, dns: Dns): OkHttpClient {
@@ -139,39 +102,8 @@ class ProxiedApkDownload(
                 .connectionPool(ConnectionPool()).build()
         }
 
-        /** Downloads [url] into [file]: reporting progress along the way (downloaded, total; -1 when the total is unknown); throws if the response is not 2xx or the download is incomplete, and leaves no target file. */
-        suspend fun fetch(http: OkHttpClient, url: String, file: File, onCall: (Call) -> Unit = {}, progress: (Long, Long) -> Unit) {
-            val part = File(file.path + PART)
-            try {
-                val call = http.newCall(Request.Builder().url(url).build())
-                onCall(call)
-                coroutineContext.ensureActive()
-                call.execute().use { resp ->
-                    if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
-                    val body = resp.body ?: throw IOException("empty body")
-                    val size = body.contentLength()
-                    var done = 0L
-                    progress(0, size)
-                    body.byteStream().use { input ->
-                        part.outputStream().use { out ->
-                            val buf = ByteArray(64 * 1024)
-                            while (true) {
-                                coroutineContext.ensureActive()
-                                val n = input.read(buf)
-                                if (n < 0) break
-                                out.write(buf, 0, n)
-                                done += n
-                                progress(done, size)
-                            }
-                        }
-                    }
-                    if (size >= 0 && done != size) throw IOException("incomplete download")
-                }
-                coroutineContext.ensureActive()
-                if (!part.renameTo(file)) throw IOException("cannot move download")
-            } finally {
-                part.delete()
-            }
-        }
+        /** 把 [url] 下到 [file]:边下边报进度(已下、总共,不知道总共为 -1);不是 2xx、或没下完整就抛错,不留目标文件。 */
+        suspend fun fetch(http: OkHttpClient, url: String, file: File, onCall: (Call) -> Unit = {}, progress: (Long, Long) -> Unit) =
+            VerifiedDownload.fetch(http, url, file, onCall, progress)
     }
 }

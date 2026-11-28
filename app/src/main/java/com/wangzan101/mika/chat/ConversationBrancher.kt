@@ -19,7 +19,7 @@ import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.util.UUID
 
-/** Result of copying a branch workspace: [skipped] items were not accepted (symlinks, out-of-bounds paths, non-regular files); when [truncated] is true the limit was exceeded and not a single file was copied. */
+/** 复制分支工作区的结果:[skipped] 是没收下的项(符号链接、越界路径、非常规文件);[truncated] 为 true 时有目录超过上限,那个目录一个文件都没复制。 */
 data class BranchCopyResult(
     val copied: Int,
     val skipped: Int = 0,
@@ -32,16 +32,17 @@ enum class RetryAttachmentStatus { COPIED, MISSING, OVER_LIMIT, FAILED }
 
 data class RetryAttachmentResult(val path: String, val status: RetryAttachmentStatus, val sizeBytes: Long? = null)
 
-/** Copies the source conversation's workspace when branching (only the user attachments in inbox/); injected by the conversation view in phase 2. */
+/** 分支时复制源对话的工作区(用户附件 inbox/ 和生成的音频、图片、视频 out/audio、out/images、out/video);阶段 2 由对话视图注入。 */
 interface BranchWorkspace {
     /**
-     * Copies only the inbox/ of the source conversation's workspace; the target workspace is created if it does not exist.
-     * Returns null when the source workspace/sandbox is unavailable or the source has no inbox; an existing target inbox is not overwritten and skipped = 1 is returned.
+     * 复制源对话工作区的 inbox/ 和生成的音频、图片、视频(out/audio、out/images、out/video);目标工作区不存在就建。
+     * 四个目录各自复制,[maxBytes] 各算各的;源没有的目录、复制失败的目录不计入,不影响其余目录;返回值是其余目录结果的合计。
+     * 源和目标是同一个工作区、源工作区/沙箱不可用、四个目录都没有结果时返回 null;目标已有的目录不覆盖,每个记 skipped = 1。
      */
     suspend fun copyInbox(
         sourceId: String,
         targetId: String,
-        maxBytes: Long = 200L * 1024 * 1024,
+        maxBytes: Long = DEFAULT_MAX_BYTES,
     ): BranchCopyResult?
 
     /** Copies the inbox once and returns the result for each sandbox path in input order; only files actually committed this time are COPIED. */
@@ -49,12 +50,17 @@ interface BranchWorkspace {
         sourceId: String,
         targetId: String,
         paths: List<String>,
-        maxBytes: Long = 200L * 1024 * 1024,
+        maxBytes: Long = DEFAULT_MAX_BYTES,
     ): List<RetryAttachmentResult> = paths.map { RetryAttachmentResult(it, RetryAttachmentStatus.FAILED) }
 
     /** Checks before sending whether the files in the target workspace can still be read safely. COPIED means currently readable. */
     suspend fun checkInboxAttachments(targetId: String, paths: List<String>): List<RetryAttachmentResult> =
         paths.map { RetryAttachmentResult(it, RetryAttachmentStatus.FAILED) }
+
+    companion object {
+        /** 分支(每个目录各算一份)和重新问(一次复制的总量)默认的字节上限。 */
+        const val DEFAULT_MAX_BYTES = 200L * 1024 * 1024
+    }
 }
 
 /** The phone implementation: both workspaces live under files/sandbox/, and copying takes the same tree lock, so it is mutually exclusive with resetting and with tasks sharing the workspace. */
@@ -72,17 +78,19 @@ class AndroidBranchWorkspace(
                 if (src == dst) return@withContext null
                 val srcDir = dirs.workspace(src)
                 val dstDir = dirs.workspace(dst)
-                val inbox = copyInboxTree(srcDir, dstDir, maxBytes) ?: return@withContext null
-                val audio = copyGeneratedAudioTree(srcDir, dstDir, maxBytes) ?: return@withContext inbox
-                val images = copyGeneratedImagesTree(srcDir, dstDir, maxBytes) ?: return@withContext inbox
-                BranchCopyResult(
-                    copied = inbox.copied + audio.copied + images.copied,
-                    skipped = inbox.skipped + audio.skipped + images.skipped,
-                    truncated = inbox.truncated || audio.truncated || images.truncated,
+                // 四个目录各自复制:源没有或复制失败的那个返回 null,不影响其余几个
+                val results = listOfNotNull(
+                    copyInboxTree(srcDir, dstDir, maxBytes),
+                    copyGeneratedAudioTree(srcDir, dstDir, maxBytes),
+                    copyGeneratedImagesTree(srcDir, dstDir, maxBytes),
+                    copyGeneratedVideoTree(srcDir, dstDir, maxBytes),
                 )
-                val video = copyGeneratedVideoTree(srcDir, dstDir, maxBytes) ?: return@withContext inbox
-                BranchCopyResult(inbox.copied + audio.copied + video.copied, inbox.skipped + audio.skipped + video.skipped,
-                    inbox.truncated || audio.truncated || video.truncated)
+                if (results.isEmpty()) return@withContext null
+                BranchCopyResult(
+                    copied = results.sumOf { it.copied },
+                    skipped = results.sumOf { it.skipped },
+                    truncated = results.any { it.truncated },
+                )
             }
         }
 
@@ -294,6 +302,8 @@ private fun copyGeneratedTree(source: File, target: File, outDir: String, tag: S
     if (!target.isDirectory && !target.mkdirs()) return null
     val dest = File(target, outDir)
     if (dest.exists() || Files.isSymbolicLink(dest.toPath())) return BranchCopyResult(copied = 0, skipped = 1)
+    // 新分支的工作区还没有 out/,不先建的话最后改名会失败
+    dest.parentFile?.let { mkdirs(it.toPath()) }
     val tmp = File(target, ".$tag-tmp-${UUID.randomUUID()}")
     if (!tmp.mkdirs()) return null
     val tmpRoot = tmp.canonicalFile.toPath()

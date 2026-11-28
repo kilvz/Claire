@@ -157,7 +157,7 @@ class ChatViewModel(
     val keptPage: StateFlow<KeptPage?> = MutableStateFlow(null),
     /** Closes the kept page (the user tapped "Close" on that row). */
     private val closeKept: () -> Unit = {},
-    /** Copies the source conversation workspace's inbox/ (attachments) when branching; when not injected, only turns are copied. */
+    /** 分支时复制源对话工作区的 inbox/(附件)和生成的音频、图片、视频(out/audio、out/images、out/video);没注入就只复制轮次。 */
     internal val branchWorkspace: BranchWorkspace? = null,
     /** Branch title: appends a localized suffix to the source title or first sentence (truncated when too long); unchanged by default. */
     internal val branchTitle: (String) -> String = { it },

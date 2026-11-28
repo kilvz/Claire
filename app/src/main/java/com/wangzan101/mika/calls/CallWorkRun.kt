@@ -95,7 +95,8 @@ internal suspend fun CallRuntime.runWork(w: Work) {
         val standard = standardCalls
         // Standard call: the owning task's state is appended as a trailing note each turn for the phone front desk, keeping the system prompt byte-for-byte unchanged
         val ownerBackground = w.ownerTask?.let(PhoneDesk::background)
-        val provider = if (standard) CascadeCallProvider(cascade, CallUse.Phone, background = ownerBackground) else if (migrated) {
+        val provider = if (standard) CascadeCallProvider(cascade, CallUse.Phone, background = ownerBackground,
+            meter = w.ownerConversationId?.let(app.conversations::meter)) else if (migrated) {
             try {
                 realtimeController.callProvider()
             } catch (e: VoiceModelError) {

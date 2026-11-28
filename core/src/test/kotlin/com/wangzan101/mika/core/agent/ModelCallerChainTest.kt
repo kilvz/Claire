@@ -93,6 +93,21 @@ class ModelCallerChainTest {
         assertEquals(1, backup.calls)
     }
 
+    @Test fun rateLimitWithoutFallbackRetriesUpToThePolicyLimit() = runTest {
+        // 单模型、没有备援:限流照策略的次数重试(1 次请求 + 3 次重试),用完原样交出。
+        RateLimitGovernor.reset()
+        val err = ModelError.RateLimited(1L)
+        val main = Scripted("main-rate-limit-single", err)
+        val retry = RetryPolicy(maxRetries = 3, jitter = { 0.0 })
+        val caller = ModelCaller(main, toolDispatcher(FakeScreen()), null, SpeedFlags.OFF, retry, {}, { 0 })
+            .also { it.reset("") }
+        var thrown: Throwable? = null
+        try { caller.ask(history, emptyList(), step = 1) } catch (e: ModelError) { thrown = e }
+        RateLimitGovernor.reset()
+        assertSame(err, thrown)
+        assertEquals(4, main.calls)
+    }
+
     @Test fun chainExhaustionSurfacesPrimaryError() = runTest {
         // The whole chain fails: the primary message is the main model's original error, and fallback errors go into the trail (MK-1 batch 2; batch 1 delivered the primary error directly).
         val mainErr = ModelError.Server(500)

@@ -82,16 +82,27 @@ class ConversationStore(
 
     @Synchronized
     private fun updateUsage(id: String, change: (ConversationUsage) -> ConversationUsage) {
-        if (safe(id) in deleted) return
+        var changed = applyUsageUpdate(id, change)
+        // 前台派出的子任务运行在隐藏子会话里,同步把用量和最近一次主模型请求记回所属前台对话。
+        if (hiddenDeskChild(id)) {
+            deskParent(id)?.takeIf { it != safe(id) }?.let { parent ->
+                if (applyUsageUpdate(parent, change)) changed = true
+            }
+        }
+        if (changed) usageRevision.value++
+    }
+
+    private fun applyUsageUpdate(id: String, change: (ConversationUsage) -> ConversationUsage): Boolean {
+        if (safe(id) in deleted) return false
         val old = usageSnapshot(id)
         val next = change(old)
-        if (old == next) return
+        if (old == next) return false
         dir.mkdirs()
         val dest = usageFile(id)
         val tmp = File(dir, "${dest.name}.tmp")
         tmp.writeText(usageJson.encodeToString(ConversationUsage.serializer(), next))
         Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        usageRevision.value++
+        return true
     }
 
     private val _changes = MutableSharedFlow<String>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -250,6 +261,7 @@ class ConversationStore(
         }
         usageRevision.value++
         deleted += safe(conversationId)
+        liveDeskParents.remove(safe(conversationId))
         pendingMainChoices.remove(safe(conversationId))
         firstMessages.remove(main)
         messageTimes.remove(main)
@@ -564,6 +576,17 @@ class ConversationStore(
         }
         val pending = pendingMainChoices.values.mapNotNull { (it as? ModelChoice.Model)?.configId }
         return (saved + pending).toSet()
+    }
+
+    /**
+     * 这个对话下一次任务开局用的主模型。自己单独选过就用自己的;前台派出的子对话没选过时跟着所属前台对话,
+     * 选择还没写进旁文件时先认那一份(和前台取模型时一样)。都没有时为 null,跟随全局。
+     * 不往子对话写旁文件:子对话藏在前台对话下,写了的话这些配置会被 [referencedModelConfigIds] 一直算作在用。
+     */
+    fun runMainChoice(conversationId: String): ModelChoice? {
+        settings(conversationId).main?.let { return it }
+        val parent = deskParent(conversationId)?.takeIf { it != safe(conversationId) } ?: return null
+        return if (hasPendingMainChoice(parent)) pendingMainChoice(parent) else settings(parent).main
     }
 
     /** 这个对话自己的运行设置；没有旁文件或读不懂时全部跟随全局。 */

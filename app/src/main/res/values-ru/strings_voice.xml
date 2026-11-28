@@ -8,6 +8,7 @@
     <string name="voice_steer_to">Сообщение для «%1$s»</string>
     <string name="voice_engine_phone">Телефон</string>
     <string name="voice_engine_phone_offline">Телефон · офлайн</string>
+    <string name="voice_engine_on_device">На устройстве · офлайн</string>
     <string name="voice_say_now">Говорите, я слушаю…</string>
     <string name="voice_recording">Идёт запись. Отпустите, и она превратится в текст…</string>
     <string name="voice_foot_live">Отпустите · слова попадут в поле, их можно будет изменить</string>
@@ -40,6 +41,8 @@
     <string name="voice_service_settings_failed">Не удалось открыть страницу настроек «%1$s». Найдите приложение в списке приложений системы и включите микрофон.</string>
     <string name="voice_unavailable_provider_gone">Провайдер выбранной речевой модели удалён. Выберите другую в разделе «Настройки» › «Модели» › «Распознавание речи».</string>
     <string name="voice_unavailable_off">Распознавание речи выключено. Выберите вариант в разделе «Настройки» › «Модели» › «Распознавание речи».</string>
+    <string name="voice_unavailable_pack_missing">Нужно скачать голосовой пакет. Выбранного офлайн-пакета нет на этом телефоне; скачайте его в разделе «Настройки» › «Модели» › «Распознавание речи», и он сразу заработает — выбирать заново не нужно.</string>
+    <string name="voice_unavailable_on_device_unsupported">Это устройство не поддерживает офлайн-распознавание. Выберите другой способ распознавания в разделе «Настройки» › «Модели» › «Распознавание речи».</string>
     <string name="voice_go_pick">Выбрать</string>
     <string name="voice_permission_title">Claire нужен микрофон</string>
     <string name="voice_permission_body">Чтобы слышать вас, пока вы удерживаете кнопку, Claire должна записывать звук. Раньше доступ был отклонён, поэтому телефон больше не спросит. Включите микрофон на странице разрешений Claire в системных настройках.</string>
@@ -65,7 +68,4 @@
     <string name="capsule_voice_not_ready">Голосовой ввод не готов · нажмите</string>
     <string name="capsule_voice_service_need_mic">Распознавание речи пока не может записывать · нажмите</string>
     <string name="capsule_voice_open">Открыть Claire</string>
-    <string name="voice_unavailable_sherpa_missing">Распознавание речи настроено на модель Sherpa-ONNX, работающую на устройстве, но она ещё не загружена. Загрузите её в «Настройки › Модели › Модели речи» или выберите другой способ распознавания.</string>
-    <string name="voice_unavailable_sherpa_failed">Не удалось запустить движок Sherpa-ONNX на устройстве. Повторите попытку или выберите другой способ распознавания в «Настройки › Модели › Речь в текст».</string>
-    <string name="voice_engine_sherpa">Sherpa-ONNX · на устройстве</string>
 </resources>

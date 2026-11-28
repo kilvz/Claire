@@ -1,5 +1,6 @@
 package com.wangzan101.mika.voice.ui
 
+import com.wangzan101.mika.voice.ondevice.OnDeviceCatalog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -42,8 +43,6 @@ import com.wangzan101.mika.core.model.TtsRequest
 import com.wangzan101.mika.voice.VoicePlayer
 import com.wangzan101.mika.voice.model.RealtimeBinding
 import com.wangzan101.mika.voice.model.RealtimeProtocol
-import com.wangzan101.mika.voice.model.SherpaModelStore
-import com.wangzan101.mika.voice.model.SherpaOnnxModels
 import com.wangzan101.mika.voice.model.SttBinding
 import com.wangzan101.mika.voice.model.SttProtocol
 import com.wangzan101.mika.voice.model.SttSelectionController
@@ -89,8 +88,6 @@ internal fun systemModelDisplayNameRes(model: VoiceModel): Int? = when {
         model.id == SttSelectionController.SYSTEM_STT_MODEL.id -> R.string.voice_catalog_system_stt_name
     model.serviceId == TtsSelectionController.SYSTEM_TTS_MODEL.serviceId &&
         model.id == TtsSelectionController.SYSTEM_TTS_MODEL.id -> R.string.voice_catalog_system_tts_name
-    model.serviceId == SherpaOnnxModels.SERVICE_ID && model.id == SherpaOnnxModels.EN20M_ID -> R.string.voice_catalog_sherpa_en_name
-    model.serviceId == SherpaOnnxModels.SERVICE_ID && model.id == SherpaOnnxModels.MULTILINGUAL_ID -> R.string.voice_catalog_sherpa_multi_name
     else -> null
 }
 
@@ -147,13 +144,15 @@ internal fun VoiceCatalogContent(viewModel: VoiceCatalogViewModel, onBack: () ->
             modifier = Modifier.fillMaxWidth().testTag("voice-catalog-add"),
         )
 
+        // 本机语音包由「离线语音包」页管(下载、删除),不在这里当普通服务编辑
+        val services = snapshot.services.filter { it.id != OnDeviceCatalog.SERVICE_ID }
         val groups = snapshot.models.groupBy { it.serviceId }
-        if (snapshot.services.isEmpty() && snapshot.models.isEmpty()) {
+        if (services.isEmpty() && snapshot.models.none { it.serviceId != OnDeviceCatalog.SERVICE_ID }) {
             Spacer(Modifier.height(20.dp))
             FooterNote(stringResource(R.string.voice_catalog_empty), Modifier.testTag("voice-catalog-empty"))
         }
 
-        snapshot.services.forEach { service ->
+        services.forEach { service ->
             val models = groups[service.id].orEmpty()
             ServiceGroup(
                 service = service,
@@ -254,8 +253,7 @@ private fun ServiceGroup(
             ModelRow(
                 model = model,
                 first = index == 0,
-                system = (system && (model.id == SttSelectionController.SYSTEM_STT_MODEL.id || model.id == TtsSelectionController.SYSTEM_TTS_MODEL.id)) ||
-                    model.serviceId == SherpaOnnxModels.SERVICE_ID,
+                system = system && (model.id == SttSelectionController.SYSTEM_STT_MODEL.id || model.id == TtsSelectionController.SYSTEM_TTS_MODEL.id),
                 snapshot = snapshot,
                 onEdit = { onEdit(model) },
                 onDelete = { onDelete(model) },
@@ -349,64 +347,7 @@ private fun ModelRow(
             if (allVerified) PillTone.Ok else PillTone.Warn,
             Modifier.testTag("voice-status-${model.id}"),
         )
-        if (model.serviceId == SherpaOnnxModels.SERVICE_ID && model.id in SherpaOnnxModels.DOWNLOADS) {
-            SherpaDownloadControl(model)
-        }
     }
-}
-
-/**
- * Download control for the optional on-device models that don't ship in the APK.
- * The bundled English model has no entry in [SherpaOnnxModels.DOWNLOADS] and no
- * row here; a downloaded model stays available offline for good.
- */
-@Composable
-internal fun SherpaDownloadControl(model: VoiceModel) {
-    val spec = SherpaOnnxModels.DOWNLOADS[model.id] ?: return
-    val context = LocalContext.current
-    val states by SherpaModelStore.states.collectAsState()
-    val state = states[model.id]
-        ?: if (SherpaModelStore.ready(context, model.id)) SherpaModelStore.State.Ready else SherpaModelStore.State.Absent
-    Spacer(Modifier.height(8.dp))
-    when (state) {
-        SherpaModelStore.State.Ready -> StatusPill(
-            stringResource(R.string.voice_catalog_sherpa_downloaded),
-            PillTone.Ok,
-            Modifier.testTag("sherpa-ready-${model.id}"),
-        )
-        is SherpaModelStore.State.Downloading -> StatusPill(
-            stringResource(R.string.voice_catalog_sherpa_downloading, (state.fraction * 100).toInt()),
-            PillTone.Warn,
-            Modifier.testTag("sherpa-downloading-${model.id}"),
-        )
-        SherpaModelStore.State.Unpacking -> StatusPill(
-            stringResource(R.string.voice_catalog_sherpa_unpacking),
-            PillTone.Warn,
-            Modifier.testTag("sherpa-unpacking-${model.id}"),
-        )
-        is SherpaModelStore.State.Failed -> Column {
-            StatusPill(stringResource(R.string.voice_catalog_sherpa_download_failed, state.message), PillTone.Warn)
-            TextButton(
-                onClick = { SherpaModelStore.start(context, model.id) },
-            ) { Text(stringResource(R.string.voice_catalog_sherpa_retry)) }
-        }
-        SherpaModelStore.State.Absent -> MikaButton(
-            stringResource(
-                R.string.voice_catalog_sherpa_download,
-                "~${spec.approximateBytes / (1024 * 1024)} MB",
-            ),
-            onClick = { SherpaModelStore.start(context, model.id) },
-            modifier = Modifier.testTag("sherpa-download-${model.id}"),
-        )
-    }
-}
-
-/** Whether [modelId]'s download or unpacking is still running; testing before it ends would report it as missing. */
-@Composable
-internal fun sherpaPreparing(modelId: String): Boolean {
-    val states by SherpaModelStore.states.collectAsState()
-    return SherpaOnnxModels.DOWNLOADS.containsKey(modelId) &&
-        (states[modelId] is SherpaModelStore.State.Downloading || states[modelId] is SherpaModelStore.State.Unpacking)
 }
 
 @Composable
@@ -422,7 +363,6 @@ private fun CapabilityBadge(
     onTest: () -> Unit,
 ) {
     val c = MikaTheme.colors
-    val preparing = sherpaPreparing(ref.modelId)
     val stopping = stoppable && ui is VoiceProbeUi.Listening
     Column(Modifier.testTag(tag)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -431,7 +371,7 @@ private fun CapabilityBadge(
             if (stopping) {
                 TextButton(onClick = onTest) { Text(stringResource(R.string.chat_stop), style = MikaType.Hint) }
             } else if (ui !is VoiceProbeUi.Running && ui !is VoiceProbeUi.Listening) {
-                TextButton(onClick = onTest, enabled = !preparing) { Text(testLabel, style = MikaType.Hint) }
+                TextButton(onClick = onTest) { Text(testLabel, style = MikaType.Hint) }
             }
         }
         when (ui) {
@@ -588,7 +528,8 @@ private fun VoiceCatalogSheet(
             if (form.sttOn) {
                 ProtocolBlock(
                     stringResource(R.string.voice_catalog_stt_protocol),
-                    SttProtocol.entries.map { it to sttProtocolLabel(it) },
+                    // 本机离线识别只由「离线语音包」页登记,不能手填成自建服务的协议
+                    SttProtocol.entries.filter { it != SttProtocol.OnDevice }.map { it to sttProtocolLabel(it) },
                     form.sttProtocol.name,
                     { name -> form.sttProtocol = SttProtocol.valueOf(name) },
                     "voice-catalog-stt-protocol",
@@ -796,7 +737,7 @@ private fun sttProtocolLabel(protocol: SttProtocol): String = vendorProtocolName
         SttProtocol.DoubaoStreaming -> R.string.voice_catalog_protocol_stt_doubao_streaming
         SttProtocol.FunAsrStreaming -> R.string.voice_catalog_protocol_stt_funasr_streaming
         SttProtocol.BailianStreaming -> R.string.voice_catalog_protocol_stt_bailian_streaming
-        SttProtocol.SherpaStreaming -> R.string.voice_catalog_protocol_stt_sherpa_streaming
+        SttProtocol.OnDevice -> R.string.voice_catalog_protocol_stt_ondevice
         else -> R.string.voice_catalog_protocol_stt_audio_transcriptions
     },
 )

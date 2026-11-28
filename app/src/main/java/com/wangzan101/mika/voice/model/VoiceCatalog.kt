@@ -45,8 +45,6 @@ enum class SttProtocol {
     DoubaoStreaming,
     FunAsrStreaming,
     BailianStreaming,
-    /** On-device streaming recognition with sherpa-onnx: no network, no account, models shipped or downloaded. */
-    SherpaStreaming,
     /** ElevenLabs speech-to-text: multipart upload, one utterance per request. */
     ElevenLabsUpload,
     /** Deepgram pre-recorded listen: raw WAV body. */
@@ -57,6 +55,8 @@ enum class SttProtocol {
     TencentSentence,
     /** iFlytek dictation WebSocket (signed URL). */
     XfyunDictation,
+    /** 本机离线识别(已安装的语音包,`endpoint` 是包 id);整段录音转写,不联网。 */
+    OnDevice,
 }
 
 @Serializable

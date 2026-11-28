@@ -28,7 +28,6 @@ import com.wangzan101.mika.voice.model.adapters.VendorSttAdapter
 import com.wangzan101.mika.voice.model.adapters.DoubaoSttAdapter
 import com.wangzan101.mika.voice.model.adapters.FunAsrSttAdapter
 import com.wangzan101.mika.voice.model.adapters.ProviderSttAdapter
-import com.wangzan101.mika.voice.model.adapters.SherpaSttAdapter
 import com.wangzan101.mika.voice.model.adapters.SttSessionFactory
 import com.wangzan101.mika.voice.model.voiceTestEnvironment
 import com.wangzan101.mika.voice.model.voiceTestProvider
@@ -86,6 +85,7 @@ class VoiceInputUnifiedTest {
         settings: SpeechSettings = SpeechSettings(MemoryPrefs()),
         capability: SystemCapability = SystemCapability(available = true, onDevice = true),
         providers: FakeVoiceProviderAccountSource = FakeVoiceProviderAccountSource(voiceTestProvider()),
+        autoPack: (String?) -> String? = { null },
     ) = VoiceInput(
         context = context,
         settings = settings,
@@ -93,6 +93,8 @@ class VoiceInputUnifiedTest {
         voiceModels = voiceTestEnvironment(catalog, providers, FakeVoiceOwnedAccountSource(), registry),
         systemCapability = { capability },
         systemCompatibility = { false },
+        autoPack = autoPack,
+        appSpeechTag = { "en-US" },
     )
 
     @Test fun `legacy gate keeps the saved legacy system choice instead of the catalog choice`() {
@@ -147,7 +149,6 @@ class VoiceInputUnifiedTest {
                 DoubaoSttAdapter(factory),
                 FunAsrSttAdapter(factory),
                 BailianSttAdapter(factory),
-                SherpaSttAdapter(factory),
             ) + VendorSttAdapter.PROTOCOLS.map { VendorSttAdapter(it, factory) },
         )
         val catalog = VoiceCatalogStore(MemoryVoiceCatalogBackend(), migrated = true)
@@ -156,7 +157,6 @@ class VoiceInputUnifiedTest {
         catalog.upsertService(VoiceService("funasr", "Fun-ASR", VoiceAccount.None))
         catalog.upsertService(VoiceService("bailian", "Bailian", VoiceAccount.VoiceOwned("bailian")))
         catalog.upsertService(VoiceService("vendor", "Vendor", VoiceAccount.VoiceOwned("vendor")))
-        catalog.upsertService(VoiceService("sherpa-onnx", "Sherpa-ONNX", VoiceAccount.None))
         val models = listOf(
             VoiceModel("provider:p1", "batch", "Batch", stt = SttBinding(SttProtocol.AudioTranscriptions)),
             VoiceModel("provider:p1", "chat", "Chat", stt = SttBinding(SttProtocol.ChatInputAudio)),
@@ -164,7 +164,6 @@ class VoiceInputUnifiedTest {
             VoiceModel("doubao", "doubao", "Doubao", stt = SttBinding(SttProtocol.DoubaoStreaming, resourceId = DoubaoProtocol.DURATION)),
             VoiceModel("funasr", "funasr", "Fun-ASR", stt = SttBinding(SttProtocol.FunAsrStreaming, endpoint = "ws://localhost:10095", language = "yue")),
             VoiceModel("bailian", "bailian", "Bailian", stt = SttBinding(SttProtocol.BailianStreaming, region = "Beijing", language = "yue")),
-            VoiceModel("sherpa-onnx", "en-20m", "Sherpa-ONNX English", stt = SttBinding(SttProtocol.SherpaStreaming)),
         ) + VendorSttAdapter.PROTOCOLS.map { VoiceModel("vendor", it.name, it.name, stt = SttBinding(it, region = "eastasia")) }
         models.forEach(catalog::upsertModel)
         val refs = models.map { VoiceModelRef(it.serviceId, it.id, VoiceCapability.STT) } + SttSelectionController.SYSTEM_STT_REF
@@ -180,7 +179,8 @@ class VoiceInputUnifiedTest {
             val expectedLanguage = if (protocol == SttProtocol.FunAsrStreaming || protocol == SttProtocol.BailianStreaming) "yue" else "en-US"
             assertEquals(protocol.name, expectedLanguage, started[protocol])
         }
-        assertEquals(SttProtocol.entries.toSet(), started.keys)
+        // 本机语音包不经会话工厂(录音用真麦克风),见 OnDeviceSttAdapterTest
+        assertEquals(SttProtocol.entries.toSet() - SttProtocol.OnDevice, started.keys)
     }
 
     @Test fun `corrupt migrated catalog never falls back to auto system recognition`() = runBlocking {
@@ -242,5 +242,127 @@ class VoiceInputUnifiedTest {
         } finally {
             server.shutdown()
         }
+    }
+
+    @Test fun `a missing or unsupported voice pack is reported as such, not as a gone provider`() = runBlocking {
+        val root = tmp.newFolder("voice-models")
+        val entry = com.wangzan101.mika.voice.model.adapters.testPackEntry("sense")
+        val catalog = VoiceCatalogStore(MemoryVoiceCatalogBackend(), migrated = true)
+        catalog.installVoicePack(entry)
+        catalog.setSttSelection(SttSelection.Model(com.wangzan101.mika.voice.ondevice.OnDeviceCatalog.ref("sense")))
+        fun registry(abi: Boolean) = VoiceAdapterRegistry(
+            sttAdapters = listOf(com.wangzan101.mika.voice.model.adapters.testOnDeviceAdapter(
+                root, com.wangzan101.mika.voice.model.adapters.FakeOnDeviceBackend(abi = abi), entry,
+            )),
+        )
+
+        val missing = input(catalog, registry(abi = true))
+        assertEquals(SpeechEngineSpec.Unavailable(SpeechEngineSpec.Why.VoicePackMissing), missing.spec())
+        assertEquals(
+            SpeechEvent.Failed(SpeechFailure.Unavailable(SpeechEngineSpec.Why.VoicePackMissing)),
+            missing.start("zh-CN").events.single(),
+        )
+
+        com.wangzan101.mika.voice.model.adapters.installTestPack(root, entry)
+        assertEquals(SpeechEngineSpec.OnDevice("sense"), missing.spec())
+        assertEquals(
+            SpeechEngineSpec.Unavailable(SpeechEngineSpec.Why.OnDeviceUnsupported),
+            input(catalog, registry(abi = false)).spec(),
+        )
+    }
+
+    /** 记下 Auto 开会话时实际走到哪个适配器、带什么语言;备援链开会话不经 [SttAdapter.start],所以这里有记录就说明没走链。 */
+    private class RecordingAdapter(override val protocol: SttProtocol) : com.wangzan101.mika.voice.model.adapters.SttAdapter {
+        val started = mutableListOf<Pair<String, String?>>()
+        override fun spec(model: com.wangzan101.mika.voice.model.ResolvedVoiceModel): SpeechEngineSpec =
+            if (protocol == SttProtocol.OnDevice) SpeechEngineSpec.OnDevice(model.model.id) else SpeechEngineSpec.System(onDevice = true)
+        override fun start(
+            context: Context,
+            model: com.wangzan101.mika.voice.model.ResolvedVoiceModel,
+            language: String?,
+            hooks: com.wangzan101.mika.voice.model.adapters.SttHooks,
+        ): SpeechSession {
+            started += model.model.id to language
+            return FakeSpeechSession()
+        }
+        override fun utterance(context: Context, model: com.wangzan101.mika.voice.model.ResolvedVoiceModel, language: String?):
+            com.wangzan101.mika.voice.model.adapters.UtteranceTranscribe = { "" }
+    }
+
+    private class AutoFixture {
+        val onDevice = RecordingAdapter(SttProtocol.OnDevice)
+        val system = RecordingAdapter(SttProtocol.AndroidSystem)
+        val cloud = RecordingAdapter(SttProtocol.AudioTranscriptions)
+        val registry = VoiceAdapterRegistry(sttAdapters = listOf(onDevice, system, cloud))
+        val catalog = VoiceCatalogStore(MemoryVoiceCatalogBackend(), migrated = true).apply {
+            installVoicePack(com.wangzan101.mika.voice.model.adapters.testPackEntry("sense"))
+            upsertService(VoiceService("provider:p1", "Provider", VoiceAccount.ExistingProvider("p1")))
+            upsertModel(VoiceModel("provider:p1", "cloud", "Cloud", stt = SttBinding(SttProtocol.AudioTranscriptions)))
+        }
+
+        init {
+            val controller = voiceTestEnvironment(catalog, registry = registry).stt
+            // 先选具体模型配好备援链,再切回自动:链还留着,但自动不该用它
+            controller.select(com.wangzan101.mika.voice.ondevice.OnDeviceCatalog.ref("sense"))
+            check(catalog.setFallback(VoiceCapability.STT, 0, VoiceModelRef("provider:p1", "cloud", VoiceCapability.STT)))
+            controller.select(SpeechChoice.Auto)
+        }
+    }
+
+    @Test fun `auto prefers a usable system recognizer over an installed pack`() {
+        val f = AutoFixture()
+        val voice = input(f.catalog, f.registry, capability = SystemCapability(available = true, onDevice = false), autoPack = { "sense" })
+
+        assertEquals(SpeechEngineSpec.System(onDevice = false), voice.spec())
+        voice.start("zh-CN")
+        assertEquals(1, f.system.started.size)
+        assertTrue(f.onDevice.started.isEmpty())
+    }
+
+    @Test fun `auto uses an installed pack when the phone has no recognizer`() {
+        val f = AutoFixture()
+        val tags = mutableListOf<String?>()
+        val voice = input(f.catalog, f.registry, capability = SystemCapability(available = false, onDevice = false), autoPack = { tags += it; "sense" })
+
+        assertEquals(SpeechEngineSpec.OnDevice("sense"), voice.spec())
+        voice.start("zh-CN")
+        assertEquals(listOf("sense" to "zh-CN"), f.onDevice.started)
+        // 卡片标签按界面语言挑,开会话按这次的识别语言挑
+        assertEquals(listOf<String?>("en-US", "zh-CN"), tags)
+    }
+
+    @Test fun `silent system with an installed pack uses the pack`() {
+        val f = AutoFixture()
+        val silent = SystemCapability(available = true, onDevice = true, responsive = false)
+        val voice = input(f.catalog, f.registry, capability = silent, autoPack = { "sense" })
+
+        assertEquals(SpeechEngineSpec.OnDevice("sense"), voice.spec())
+        voice.start(null)
+        assertEquals(listOf("sense" to "en-US"), f.onDevice.started)
+        assertTrue(f.system.started.isEmpty())
+    }
+
+    @Test fun `auto without a pack keeps the existing reason`() {
+        val f = AutoFixture()
+        val none = input(f.catalog, f.registry, capability = SystemCapability(available = false, onDevice = false))
+        assertEquals(SpeechEngineSpec.Unavailable(SpeechEngineSpec.Why.NoSystemNoModel), none.spec())
+        assertEquals(
+            SpeechEvent.Failed(SpeechFailure.Unavailable(SpeechEngineSpec.Why.NoSystemNoModel)),
+            runBlocking { none.start("zh-CN").events.single() },
+        )
+        val silent = input(f.catalog, f.registry, capability = SystemCapability(available = true, onDevice = true, responsive = false))
+        assertEquals(SpeechEngineSpec.Unavailable(SpeechEngineSpec.Why.SystemNoResponse), silent.spec())
+        assertTrue(f.onDevice.started.isEmpty() && f.system.started.isEmpty())
+    }
+
+    @Test fun `auto never uses the fallback chain`() {
+        val f = AutoFixture()
+        assertEquals(1, f.catalog.state.value.selections.sttFallbacks.size)
+        val voice = input(f.catalog, f.registry, capability = SystemCapability(available = false, onDevice = false), autoPack = { "sense" })
+
+        voice.start("zh-CN")
+        // 走备援链时会话由链自己拼,不经适配器的 start;这里经了,说明没带备援
+        assertEquals(listOf("sense" to "zh-CN"), f.onDevice.started)
+        assertTrue(f.cloud.started.isEmpty())
     }
 }

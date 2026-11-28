@@ -369,13 +369,7 @@ class ProactiveRuntime(
         else -> SourceTier.Mid
     }
 
-    /** Change one App's source tier. Setting it to low means "do not learn from it": its captured events, raw notifications and sentences are removed too (on the serial coroutine). */
-    fun setLearnTier(packageName: String, tier: SourceTier) {
-        storeTier(packageName, tier)
-        scope.launch { if (tier == SourceTier.Low) learn.forgetApps(setOf(packageName)) else learn.poke() }
-    }
-
-    /** Store the tier (the state flows change first, the work on the serial coroutine happens after: it reads the updated values). */
+    /** 记下档位(状态流先改,串行协程上的事后做:它们读的是改好的值)。 */
     private fun storeTier(packageName: String, tier: SourceTier) {
         val high = if (tier == SourceTier.High) _learnHigh.value + packageName else _learnHigh.value - packageName
         prefs.learnHigh = high

@@ -102,8 +102,11 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.theme.MikaRadius
 import com.wangzan101.mika.ui.theme.MikaShapes
+import com.wangzan101.mika.voice.model.VoiceModelError
 import com.wangzan101.mika.voice.HoldToTalk
 import com.wangzan101.mika.voice.SpeechEngineSpec
+import com.wangzan101.mika.voice.model.VoiceModelEnvironment
+import com.wangzan101.mika.voice.ondevice.OnDeviceSttException
 import com.wangzan101.mika.voice.SpeechFailure
 import com.wangzan101.mika.voice.SpeechServiceMic
 import com.wangzan101.mika.voice.SystemSpeech
@@ -195,7 +198,17 @@ internal fun HeardText(stable: String, tail: String, style: androidx.compose.ui.
     }
 }
 
-/** The strings the UI needs during push-to-talk; touches no UI, so unit tests can test it directly. */
+/**
+ * 本机识别失败给用户的那一句:原因链里是「文件损坏」([OnDeviceSttException.Kind.Corrupt])才说「语音包已损坏,请重新下载」;
+ * 超时、内存不足、解码出错([OnDeviceSttException.Kind.Failed])、取消、模型被释放、清单读不了等重新下载没用,只说「离线识别失败,请重试」。
+ */
+internal fun onDeviceFailureText(error: VoiceModelError.OnDeviceFailed): Int {
+    val corrupt = generateSequence<Throwable>(error) { it.cause }.take(8)
+        .any { it is OnDeviceSttException && it.kind == OnDeviceSttException.Kind.Corrupt }
+    return if (corrupt) R.string.voice_pack_corrupt_error else R.string.voice_on_device_failed
+}
+
+/** 按住说话时界面上要的文字;不碰界面,单测直接测。 */
 internal object VoiceCopy {
     /** Where a sentence ends: break after these punctuation marks. */
     private val sentenceEnd = setOf('。', '！', '？', '；', '!', '?', ';', '.', '…', '\n')
@@ -233,7 +246,7 @@ internal object VoiceCopy {
         is SpeechEngineSpec.System -> tr(if (spec.onDevice) R.string.voice_engine_phone_offline else R.string.voice_engine_phone)
         is SpeechEngineSpec.Provider -> spec.model
         is SpeechEngineSpec.Vendor -> spec.model
-        is SpeechEngineSpec.Sherpa -> tr(R.string.voice_engine_sherpa)
+        is SpeechEngineSpec.OnDevice -> tr(R.string.voice_engine_on_device)
         is SpeechEngineSpec.Unavailable -> ""
     }
 
@@ -242,8 +255,14 @@ internal object VoiceCopy {
         SpeechFailure.Busy -> tr(R.string.voice_busy)
         SpeechFailure.Network -> tr(R.string.voice_network)
         SpeechFailure.MicUnavailable, SpeechFailure.AudioError -> tr(R.string.voice_mic_unavailable)
-        // Provider errors reuse the wording used for model errors (quota, key, model not found, …)
-        is SpeechFailure.Provider -> tr(R.string.voice_provider_failed, why.error.message.orEmpty())
+        is SpeechFailure.Provider -> when (why.error) {
+            // 本机语音包没装:和开不了会话时同一句「需要下载」
+            is VoiceModelError.PackMissing -> unavailable(SpeechEngineSpec.Why.VoicePackMissing)
+            // 本机识别失败:说该怎么办,不露英文的原因(只有文件坏了才叫人重新下载)
+            is VoiceModelError.OnDeviceFailed -> tr(onDeviceFailureText(why.error))
+            // 服务商的错沿用模型出错时的说法(额度、Key、找不到模型……)
+            else -> tr(R.string.voice_provider_failed, why.error.message.orEmpty())
+        }
         SpeechFailure.NoPermission -> tr(R.string.voice_permission_title)
         is SpeechFailure.ServiceNoPermission -> tr(R.string.voice_service_permission_title)
         is SpeechFailure.Unavailable -> tr(R.string.voice_unavailable_title)
@@ -260,8 +279,14 @@ internal object VoiceCopy {
         SpeechEngineSpec.Why.SystemFailed -> tr(R.string.voice_unavailable_system_failed)
         SpeechEngineSpec.Why.ProviderGone -> tr(R.string.voice_unavailable_provider_gone)
         SpeechEngineSpec.Why.Off -> tr(R.string.voice_unavailable_off)
-        SpeechEngineSpec.Why.SherpaModelMissing -> tr(R.string.voice_unavailable_sherpa_missing)
-        SpeechEngineSpec.Why.SherpaFailed -> tr(R.string.voice_unavailable_sherpa_failed)
+        SpeechEngineSpec.Why.VoicePackMissing -> tr(R.string.voice_unavailable_pack_missing)
+        SpeechEngineSpec.Why.OnDeviceUnsupported -> tr(R.string.voice_unavailable_on_device_unsupported)
+    }
+
+    /** 「还不能语音输入」里要不要给「下载离线语音包」:没有能用的识别、自带识别不响应、选的语音包没装。 */
+    fun offersVoicePacks(why: SpeechEngineSpec.Why): Boolean = when (why) {
+        SpeechEngineSpec.Why.NoSystemNoModel, SpeechEngineSpec.Why.SystemNoResponse, SpeechEngineSpec.Why.VoicePackMissing -> true
+        else -> false
     }
 
     /** The countdown for the last ten seconds; null while there is still time. */
@@ -739,10 +764,22 @@ internal fun Modifier.voiceDim(on: Boolean, reduceMotion: Boolean): Modifier {
 /** The "voice input not available yet" explanation ("choose" leads to the transcriber picker in settings) and the recording permission explanation ("open settings" leads to Claire's permission page in the system). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
+internal fun VoiceSheetHost(
+    vh: VoiceHold,
+    onPickSpeech: () -> Unit,
+    onOpenVoicePacks: () -> Unit = {},
+    /** 这台设备有没有能跑的离线语音包(没有就不给「下载离线语音包」);null 是看 App 里的语音包环境。测试里换掉。 */
+    voicePacksAvailable: (() -> Boolean)? = null,
+) {
     val sheet = vh.sheet ?: return
     val c = MikaTheme.colors
     val context = LocalContext.current
+    val packsHere = remember(sheet) {
+        (sheet as? VoiceSheet.Unavailable)?.let { VoiceCopy.offersVoicePacks(it.why) } == true &&
+            (voicePacksAvailable?.invoke() ?: VoiceModelEnvironment.get(context).hasRunnableVoicePacks())
+    }
+    // 语音包缺了:主按钮就是去下载;别的没引擎的情况在下面再加一个
+    val packFirst = packsHere && (sheet as VoiceSheet.Unavailable).why == SpeechEngineSpec.Why.VoicePackMissing
     val title: String
     val body: String
     val action: String
@@ -754,52 +791,9 @@ internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
     when (sheet) {
         is VoiceSheet.Unavailable -> {
             title = stringResource(R.string.voice_unavailable_title)
-            // NoSystemNoModel / SystemGone mean the phone has no recognition
-            // service at all; the other cases are a broken or busy service.
-            if (sheet.why == SpeechEngineSpec.Why.NoSystemNoModel || sheet.why == SpeechEngineSpec.Why.SystemGone) {
-                val installed = SystemSpeech.installedSpeechApp(context)
-                if (installed != null) {
-                    // The app is on the phone but Android is not offering its recognition service
-                    // (disabled, its component is off, or this build only carries TTS). Never send
-                    // the user back to a Play Store page that already says "Installed".
-                    body = stringResource(R.string.voice_unavailable_system_gone)
-                    fix = stringResource(R.string.voice_permission_open) to {
-                        try {
-                            context.startActivity(
-                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", installed, null))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        } catch (_: RuntimeException) {
-                            vh.toast = tr(R.string.voice_service_settings_failed, SpeechServiceMic.label(context, installed))
-                        }
-                    }
-                } else {
-                    body = stringResource(R.string.voice_unavailable_built_in_missing)
-                    fix = stringResource(R.string.voice_get_speech_service) to {
-                        // market:// first, web fallback; a phone without a Play
-                        // Store must never crash — toast instead.
-                        try {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${SystemSpeech.SPEECH_APP_PACKAGE}"))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        } catch (_: RuntimeException) {
-                            try {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${SystemSpeech.SPEECH_APP_PACKAGE}"))
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                )
-                            } catch (_: RuntimeException) {
-                                vh.toast = tr(R.string.voice_speech_service_store_failed)
-                            }
-                        }
-                    }
-                }
-            } else {
-                body = VoiceCopy.unavailable(sheet.why)
-            }
-            action = stringResource(R.string.voice_go_pick)
-            go = onPickSpeech
+            body = VoiceCopy.unavailable(sheet.why)
+            action = stringResource(if (packFirst) R.string.voice_go_voice_packs else R.string.voice_go_pick)
+            go = if (packFirst) onOpenVoicePacks else onPickSpeech
         }
         is VoiceSheet.ServicePermission -> {
             val service = sheet.service
@@ -847,6 +841,15 @@ internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
             Row(Modifier.fillMaxWidth().padding(top = if (fix != null) 10.dp else 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MikaButton(stringResource(R.string.ok_got_it), { vh.sheet = null }, Modifier.weight(1f), kind = ButtonKind.Tonal, size = ButtonSize.Medium)
                 MikaButton(action, { vh.sheet = null; go() }, Modifier.weight(1f), size = ButtonSize.Medium)
+            }
+            if (packsHere && !packFirst) {
+                MikaButton(
+                    stringResource(R.string.voice_go_voice_packs),
+                    { vh.sheet = null; onOpenVoicePacks() },
+                    Modifier.fillMaxWidth().padding(top = 10.dp).testTag("voice-sheet-voice-packs"),
+                    kind = ButtonKind.Tonal,
+                    size = ButtonSize.Medium,
+                )
             }
         }
     }

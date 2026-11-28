@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="models_voice_catalog">Modelos de voz</string>
-    <string name="models_voice_catalog_sub">Gerencie modelos de fala para texto, texto para fala e chamadas ao vivo em um só lugar</string>
     <string name="voice_catalog_title">Modelos de voz</string>
     <string name="voice_catalog_sub">Gerencie modelos de fala para texto, texto para fala e chamadas ao vivo em um só lugar. Capacidades e protocolos são declarados aqui; as páginas de entrada de voz, leitura e chamadas apenas escolhem e usam preferências.</string>
     <string name="voice_catalog_add">Adicionar modelo</string>
@@ -45,6 +44,7 @@
     <string name="voice_catalog_listening">Ouvindo, diga algo…</string>
     <string name="voice_catalog_incomplete">Preencha primeiro os dados da conta.</string>
     <string name="voice_catalog_protocol_stt_android_system">Sistema Android</string>
+    <string name="voice_catalog_protocol_stt_ondevice">No dispositivo</string>
     <string name="voice_catalog_protocol_stt_audio_transcriptions">Transcrição de áudio</string>
     <string name="voice_catalog_protocol_stt_chat_input_audio">Áudio de entrada do chat</string>
     <string name="voice_catalog_protocol_stt_gemini_inline">Gemini inline</string>
@@ -59,14 +59,4 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">Volc duplex</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI em tempo real</string>
     <string name="voice_catalog_tts_sample">Olá, este é um teste de voz.</string>
-    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX (no dispositivo)</string>
-    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX inglês (no dispositivo)</string>
-    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX multilíngue (baixar)</string>
-    <string name="voice_catalog_sherpa_download">Baixar (%1$s)</string>
-    <string name="voice_catalog_sherpa_downloading">Baixando… %1$d%%</string>
-    <string name="voice_catalog_sherpa_unpacking">Descompactando o modelo…</string>
-    <string name="voice_catalog_sherpa_downloaded">Modelo baixado</string>
-    <string name="voice_catalog_sherpa_download_failed">Falha no download: %1$s</string>
-    <string name="voice_catalog_sherpa_retry">Baixar novamente</string>
-    <string name="voice_catalog_sherpa_needs_download">O modelo precisa ser baixado primeiro.</string>
 </resources>

@@ -57,25 +57,28 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 /**
- * Wiring for the floating capsule: it hands each task's state ([TaskCenterState.runs] plus every [TaskRun]'s state, takeover stage and activities), the switches,
- * whether Claire's UI is in the foreground ([AppForeground]), whether the screen is on ([DeviceStateWatcher]) and whether the accessibility service exists to [CapsuleModel],
- * and, based on its result, adds, moves or tears down the overlay windows through [com.wangzan101.mika.cap.phone.a11y.OverlayHost].
- * Tapping the ball or the capsule expands the card ([CapsuleCards] decides the content and tells a single item); tapping outside the card, the collapse button or Back shrinks it back to a ball (what was seen is not expanded again, and the model remembers); the buttons on the card and the capsule all map to existing task-service actions.
- * The ball and the card each live in their own window and keep their own positions (see [window]): on expansion the ball's window is explicitly hidden and the card scales and fades in within its own window from the ball's direction,
- * and on collapse it shrinks back and the ball pops out at the edge again ([OverlayMotion]: only layers move; the window is not repositioned and its size is not changed per frame).
- * Double-tapping the ball or capsule (see [DoubleTap]: a single tap waits out the double-tap timeout before expanding, and the two taps must come from the same source and land close together) captures the user's current screen into that card's input-field preview,
- * without sending it directly; only after the user has seen the preview and pressed Send does it take the same path as sending a message from the card. The screenshot button to the left of the card's input field also attaches it above the input field, so an extra message can be added before sending.
- * While capturing, the overlay is hidden first and comes back afterwards, with a flash on the ball.
- * Only while the card's bottom input field is open can the overlay accept the keyboard; it is handed back immediately on send, collapse, tapping outside or Back; when the IME appears, the capsule and the card move above it.
- * Long-pressing the ball or capsule talks (see [CapsuleTalk], [CapsuleVoicePanel]): while held, the whole screen dims and a panel with two targets, "Cancel" and "Amend", floats up next to the capsule;
- * releasing sends straight to the card that a single tap would expand (same target lookup as sending a screen on double tap), dragging to "Amend" opens the card with the text in the input field, and dragging to "Cancel" discards it;
- * when sent, not heard clearly, or unavailable, a line flashes on the capsule ([note]). The panel lives in another window below the ball's window and does not take touches.
- * That item's screen is only captured while the card is expanded (at most [PREVIEW_FPS] frames per second; nothing is pushed when unchanged). Normally it is a single icon, and it expands into a capsule when there is something to say (the model decides);
- * it can be dragged, and on release it snaps to the nearest left or right edge; the resting position is recorded by edge and height ratio in [FeatureFlags], and re-placed by ratio after rotation.
- * The card is horizontally centered (a conversation card has a fixed height; a task card is sized to content, at most the same height), dragged up and down by its title bar, with the top ratio recorded separately, so switching cards leaves the top edge unchanged;
- * the conversation card's thread is read from [ConversationStore] (the same copy as the chat page),
- * and the apps operated are read from that turn's run record ([RunStore]).
- * If the overlay cannot be drawn (the service just disconnected, the system refuses), no further retries happen on this service instance; the capsule does not appear and notifications carry on as before. Everything runs on the main thread.
+ * 悬浮胶囊的接线:把各任务的状态([TaskCenterState.runs] 和每个 [TaskRun] 的状态、接管阶段、活动)、开关、
+ * Mika 界面在不在前台([AppForeground])、屏幕亮没亮([DeviceStateWatcher])、无障碍服务在不在交给 [CapsuleModel],
+ * 按它的结果经 [com.wangzan101.mika.cap.phone.a11y.OverlayHost] 加上、挪动或拆掉浮层窗口。
+ * 点一颗或胶囊展开卡片([CapsuleCards] 定内容,只说一件事),点卡片外面、收起按钮或返回收回成一颗(看过的不再展开,模型记着);卡片和胶囊上的按钮都转成任务服务现有的动作。
+ * 一颗和卡片各在一个窗口里、各待各的位置(见 [window]):展开时一颗那个窗口显式隐藏,卡片在自己的窗口里从那一颗的方位缩放、淡入,
+ * 收起时缩回去,一颗再在边上冒出来([OverlayMotion]:只动图层,不挪窗口,也不逐帧改窗口大小)。
+ * 双击一颗或胶囊(见 [DoubleTap]:单击要等双击的时限过去才展开,两下还要同来源、落点相近)把用户此刻的屏幕截进那张卡片的输入框预览,
+ * 不直接发出;用户看过预览、按发送后才和在卡片里发一句话走同一条路。卡片输入框左边的截屏按钮也挂在输入框上面,可以补一句再发。
+ * 截的时候浮层先藏起来,截完再出来,一颗上闪一下。
+ * 卡片底部的输入框点开时浮层才能接收键盘,发出、收起、点外面、按返回时马上还回去;输入法弹出时胶囊和卡片挪到它上面。
+ * 长按一颗或胶囊说话(见 [CapsuleTalk]、[CapsuleVoicePanel]):按着时整屏压暗、胶囊旁边浮出面板和「取消」「改一改」两个落点,
+ * 松开直接发给单击会展开的那张卡片(和双击发屏幕同一套找目标),拖到「改一改」打开卡片、字在输入框里,拖到「取消」丢掉;
+ * 发出、没听清、用不了时胶囊上闪一句([note])。面板在一颗那个窗口下面的另一个窗口里,不接触摸。
+ * 卡片展开时才收那件事的画面(每秒至多 [PREVIEW_FPS] 张,没变不推)。平时是一颗图标,有事要说时展开成胶囊(模型定);
+ * 可以拖,松手贴到最近的左边或右边;停的位置按边和高度比例记在 [FeatureFlags],转屏后按比例重新摆。
+ * 开了贴边自动隐藏([CapsuleEdge])时缩成贴边半圆:窗口**一直是一颗那么大**,只是整块挪到屏幕外只留 [SLIVER_DP],
+ * 换状态时只挪窗口、不改窗口尺寸(系统不会跑窗口缩放过渡)。收起先放收起动效([CapsuleOverlays]),点一下半圆照常
+ * 展开,只有**从半圆拖出来**这一下直接到位、从第一帧就跟手。
+ * 卡片左右居中(对话卡片固定高,任务卡片按内容高、最多一样高),按着标题栏上下拖,上边的比例另记一份,换卡片时上边不动;
+ * 对话卡片的来回从 [ConversationStore] 读(和对话页同一份),
+ * 操作过的 App 从那一轮的运行记录([RunStore])里读。
+ * 浮层画不出来(服务刚断开、系统不让)时这个服务实例上不再重试,胶囊不出现,通知照旧。全部在主线程。
  */
 class CapsuleController(
     internal val context: Context,
@@ -190,6 +193,13 @@ class CapsuleController(
     /** The height ratio of the "You handle it" bar (remembered only for this run). */
     internal var barFraction = 0f
     internal var dragging = false
+    /** 这一次是从贴边半圆拖出来的:一颗直接到位(见 [CapsuleOverlay]),不走展开动效,从第一帧就跟手。 */
+    internal var revealInstant by mutableStateOf(false)
+    /** 正在放收起动效:这一颗正朝边上缩小淡出,播完([finishTuck])才换成贴边半圆。 */
+    internal var tucking by mutableStateOf(false)
+    /** 收起动效放完、窗口已经挪到屏幕外,等下一帧再换成半圆(这一帧画面上什么都没有,不闪)。 */
+    internal var tuckPending by mutableStateOf(false)
+    internal var tuckJob: Job? = null
     internal var dragStartX = 0
     internal var dragStartY = 0
     internal var placedY = 0
@@ -396,11 +406,18 @@ class CapsuleController(
             val a = area() ?: return
             resetTaps()
             snap?.cancel()
-            val wasHidden = edgeHidden
-            wake()
+            val wasHidden = edgeHidden || tuckPending
+            // 刚收起、还差一帧换半圆时抓住它:就当作已经藏起来了
+            tuckPending = false
+            // 先立起 dragging:紧接着的 wake() 里会 fade,那里看见正在拖就不再 place,窗口不先跳回停靠位。
+            // 从半圆拖出来这一下直接到位(拖动要跟手),点开、自动隐藏仍照常放动效
             dragging = true
-            // The revealed ball is 40dp plus its shadow room; its layout resize arrives next frame.
-            dragStartX = CapsuleDocking.dockedX(dock.side, a, if (wasHidden) dp(PILL_DP) else w.width)
+            revealInstant = wasHidden
+            wake()
+            // 窗口一直是能拖的那颗那么大(藏起来时也一样,见 [CapsuleEdge.tuckedOffset]):
+            // 拖出来只是挪位置、不改窗口尺寸,系统不会跑缩放过渡,从第一帧就跟手
+            dragStartX = if (wasHidden) CapsuleDocking.tuckedX(dock.side, a, w.width)
+                else CapsuleDocking.dockedX(dock.side, a, w.width)
             dragStartY = placedY
         }
 
@@ -418,9 +435,11 @@ class CapsuleController(
             val a = area()
             if (!dragging || w == null || a == null) {
                 dragging = false
+                revealInstant = false
                 return
             }
             dragging = false
+            revealInstant = false
             val y = CapsuleDocking.fitY(dragStartY + dy.toInt(), a, w.height)
             if (isBar()) {
                 barFraction = CapsuleDocking.fraction(y, a, dp(BAR_DP))
@@ -532,8 +551,17 @@ class CapsuleController(
         const val TOP_GAP_DP = 8
         /** Window height of the capsule and of that bar including the shadow margin (used when placing the height by ratio). */
         const val PILL_DP = 40 + 16
+        /**
+         * 一颗(圆形图标)连同四周阴影边的窗口宽高:胶囊窗口平时就是这个大小,**藏起来时也不变小**,
+         * 只是整块挪到屏幕外只留 [SLIVER_DP];出来时窗口尺寸不变,系统不会跑缩放过渡,拖动第一帧就跟手。
+         */
+        const val BALL_DP = 40 + 16
+        /** 藏起来时露在屏幕边上的半圆宽度。 */
+        const val SLIVER_DP = 20
         const val BAR_DP = 48 + 16
         const val SNAP_MS = 220L
+        /** 收起动效放完后等下一帧才换半圆;超过这么久还没等到帧(浮层帧停了)就直接换。 */
+        const val TUCK_COMMIT_MS = 50L
 
         const val ROTATE_SETTLE_MS = 300L
         /**

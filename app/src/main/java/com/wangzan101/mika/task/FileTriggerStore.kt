@@ -141,7 +141,7 @@ class FileTriggerStore(
             bytes = file.readBytes()
             snapshot = Json.decodeFromString<TriggerSnapshot>(bytes.toString(Charsets.UTF_8))
         } catch (_: Exception) {
-            file.copyTo(File(file.parentFile, file.name + ".corrupt"), overwrite = true)
+            file.keepCorruptCopy()
             return empty
         }
         val hash = bytes.sha256()
@@ -156,7 +156,7 @@ class FileTriggerStore(
         return runCatching {
             CONDITION_JSON.decodeFromString<ConditionPlanSnapshot>(conditionFile.readText())
         }.getOrElse {
-            conditionFile.copyTo(File(conditionFile.parentFile, conditionFile.name + ".corrupt"), overwrite = true)
+            conditionFile.keepCorruptCopy()
             ConditionPlanSnapshot()
         }
     }

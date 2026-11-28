@@ -189,16 +189,6 @@ internal fun CallRuntime.canAutomaticallyAnswerHere(): Boolean = CallStandbyPoli
     notificationsAllowed = standbyService != null && CallStandbyService.notificationsAvailable(app),
 )
 
-suspend fun CallRuntime.pauseAutoAnswer(minutes: Int): CallActionResult = onMain {
-    if (minutes !in 1..CallPolicy.MAX_AUTO_ANSWER_PAUSE_MINUTES) {
-        return@onMain fail("The pause must be between 1 minute and 24 hours")
-    }
-    if (!settings.state.value.enabled || !settings.state.value.autoAnswer) {
-        return@onMain fail("Auto-answer is not on yet")
-    }
-    saveAutoPause(System.currentTimeMillis() + minutes * 60_000L)
-}
-
 suspend fun CallRuntime.resumeAutoAnswer(): CallActionResult = onMain { saveAutoPause(null) }
 
 internal suspend fun CallRuntime.saveAutoPause(until: Long?): CallActionResult {

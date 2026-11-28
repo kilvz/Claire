@@ -244,12 +244,10 @@ internal object ScreenReader {
         if (!n.isEnabled) add(UiStates.DISABLED)
     }
 
-    /** isChecked is deprecated in API 36 in favour of the tri-state checked; only a fully checked node matches the old boolean. */
-    private fun AccessibilityNodeInfo.isCheckedCompat(): Boolean {
-        if (Build.VERSION.SDK_INT >= 36) return checked == AccessibilityNodeInfo.CHECKED_STATE_TRUE
-        @Suppress("DEPRECATION")
-        return isChecked
-    }
+    // isChecked 在 API 36 起被三态的 checked 取代;minSdk 29 仍需用它
+    @Suppress("DEPRECATION")
+    private fun states(n: AccessibilityNodeInfo) =
+        "${n.isChecked}${n.isSelected}${n.isEnabled}${n.isFocused}${n.textSelectionStart}:${n.textSelectionEnd}"
 
     private fun states(n: AccessibilityNodeInfo) =
         "${n.isCheckedCompat()}${n.isSelected}${n.isEnabled}${n.isFocused}${n.textSelectionStart}:${n.textSelectionEnd}"
@@ -322,10 +320,14 @@ internal object ScreenReader {
         return if (joined.length > AGGREGATE_MAX) joined.take(AGGREGATE_MAX) + "…" else joined
     }
 
-    /** `com.x:id/cart_icon` → `cart_icon`; an obfuscated short name reveals no purpose, so none is given. */
+    // 每个节点都要判一次,正则只编译一回
+    private val ID_WORD = Regex("^[A-Za-z0-9_]{4,}$")
+    private val ID_LETTERS = Regex("[A-Za-z]{3}")
+
+    /** `com.x:id/cart_icon` → `cart_icon`;混淆过的短名认不出用途,不给。 */
     private fun readableResourceId(id: String?): String? {
         val short = id?.substringAfterLast('/') ?: return null
-        return short.takeIf { Regex("^[A-Za-z0-9_]{4,}$").matches(it) && Regex("[A-Za-z]{3}").containsMatchIn(it) }
+        return short.takeIf { ID_WORD.matches(it) && ID_LETTERS.containsMatchIn(it) }
     }
 
     private const val FNV_OFFSET = -0x340d631b7bdddcdbL

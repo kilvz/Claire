@@ -102,14 +102,28 @@ val chatgptSignInCheck by tasks.registering(JavaExec::class) {
     outputs.upToDateWhen { false }
 }
 
-tasks.test {
-    // The cross-language CLI contract is run explicitly by cliTest; pure JVM tests do not require Python on the machine.
-    exclude("**/RemoteCliContractTest*")
-    // The real-gateway cross-language test is run explicitly; ordinary JVM tests do not require Go to be installed.
-    exclude("**/RelayGatewayIntegrationTest*")
-    // testFixtures puts core's jar ahead of the test classpath; put the directories first so tests that read resources by directory still find the files
-    classpath = sourceSets.main.get().output + classpath
-    // TaskSetTest reads the evaluation task set in the repository root
+// 读 core 以外仓库文件(文档、README、app 源码与资源、评测任务集)的测试。单独成一个任务,只有它挂这些输入:
+// 只改 app 或文档时 core 的其余测试保持 UP-TO-DATE,不必整套重跑。test 依赖它,./gradlew :core:test 照样全跑。
+val repoTestClasses = listOf(
+    "**/core/DocsConsistencyTest*",
+    "**/docs/ReadmeSectionsTest*",
+    "**/docs/ReadmeTranslationsTest*",
+    "**/capability/PackageDependencyTest*",
+    "**/action/SingleEntryTest*",
+    "**/prompt/RegexPortabilityTest*",
+    "**/general/MemoryRequestsTest*",
+    "**/eval/TaskSetTest*",
+    "**/eval/RescoreEvalRun*",
+)
+
+val repoTest by tasks.registering(Test::class) {
+    group = "verification"
+    description = "读仓库文档、README、app 源码和评测任务集的一致性测试"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    // testFixtures 会把 core 的 jar 放到测试类路径前面;让目录排在前面,按目录读资源的测试才找得到文件
+    classpath = sourceSets.main.get().output + sourceSets.test.get().runtimeClasspath
+    include(repoTestClasses)
+    // TaskSetTest 读仓库根目录的评测任务集
     inputs.dir(rootProject.file("eval")).withPropertyName("evalTasks")
     // DocsConsistencyTest and ReadmeTranslationsTest read the repository documentation (README.md in the root, and the per-language translations under docs/readme/ which live in docs) and compare it against the app sources; a change to the documentation or app sources requires a rerun
     inputs.files(rootProject.file("README.md"), rootProject.file("tools/sandbox/README.md")).withPropertyName("docsFiles")
@@ -117,7 +131,21 @@ tasks.test {
     inputs.dir(rootProject.file("app/src")).withPropertyName("appSources")
     // updateReadme rewrites README first, so tests in the same build read the rewritten version
     mustRunAfter(updateReadme)
-    // Golden message sequences for loop scenarios; regenerated with -PupdateSnapshots (see LoopSnapshot)
+}
+
+tasks.test {
+    // 跨语言 CLI 契约由 cliTest 显式运行;纯 JVM 测试不要求电脑安装 Python。
+    exclude("**/RemoteCliContractTest*")
+    // 真网关跨语言测试显式运行,普通 JVM 测试不要求安装 Go。
+    exclude("**/RelayGatewayIntegrationTest*")
+    // 读仓库文件的测试归 repoTest(见上)
+    exclude(repoTestClasses)
+    dependsOn(repoTest)
+    // testFixtures 会把 core 的 jar 放到测试类路径前面;让目录排在前面,按目录读资源的测试才找得到文件
+    classpath = sourceSets.main.get().output + classpath
+    // updateReadme 先改写 README,同一次构建里测试要读改写后的
+    mustRunAfter(updateReadme)
+    // 循环场景的消息序列金样;-PupdateSnapshots 时重新生成(见 LoopSnapshot)
     systemProperty("mika.snapshotDir", file("src/test/resources/loop-snapshots").absolutePath)
     // Goldens for the prompt surface (system prompts, tool definitions, feedback text); likewise regenerated with -PupdateSnapshots (see PromptSurface)
     systemProperty("mika.promptSurfaceDir", file("src/test/resources/prompt-surface").absolutePath)

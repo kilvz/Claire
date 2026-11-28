@@ -139,8 +139,6 @@ internal fun ProviderStore.asRole(cfg: ProviderConfig, role: ModelRole): Provide
     return if (sees == cfg.capabilities.vision) cfg else cfg.copy(capabilities = cfg.capabilities.copy(vision = sees))
 }
 
-internal fun ProviderStore.asMain(cfg: ProviderConfig): ProviderConfig = asRole(cfg, ModelRole.Main)
-
 /**
  * Builds a model for the given role from a config id (for fallback chains): metering and the daily budget check follow the same path as that role.
  * Null when the config does not exist.

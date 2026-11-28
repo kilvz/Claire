@@ -49,7 +49,7 @@ private class FakeSession(flow: Flow<SpeechEvent>) : SpeechSession {
     override fun cancel() {}
 }
 
-/** A live, unlimited session: it only finishes when released, like sherpa-onnx and streaming vendors. */
+/** A live, unlimited session: it only finishes when released, like the streaming vendors. */
 private class LiveSession : SpeechSession {
     private val channel = Channel<SpeechEvent>(Channel.UNLIMITED)
     override val events: Flow<SpeechEvent> = channel.receiveAsFlow()
@@ -229,7 +229,7 @@ class VoiceCatalogViewModelTest {
     @Test fun `a second verifyStt on a live model stops the running capture`() = runTest {
         val catalog = VoiceCatalogStore(MemoryVoiceCatalogBackend(), migrated = true)
         catalog.upsertService(VoiceService("local", "Local", VoiceAccount.None))
-        catalog.upsertModel(VoiceModel("local", "live", "Live", stt = SttBinding(SttProtocol.SherpaStreaming)))
+        catalog.upsertModel(VoiceModel("local", "live", "Live", stt = SttBinding(SttProtocol.FunAsrStreaming)))
         val env = voiceTestEnvironment(catalog, FakeVoiceProviderAccountSource(voiceTestProvider()))
         val session = LiveSession()
         val probe = VoiceModelProbe(

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="persona_title">شخصیت</string>
-    <string name="persona_sub">انتخاب کنید Claire چگونه با شما صحبت کند</string>
     <string name="persona_default">پیش‌فرض</string>
     <string name="persona_default_sub">شیوهٔ همیشگی صحبت کردن Claire</string>
     <string name="persona_empty">هنوز شخصیتی نساخته‌اید</string>

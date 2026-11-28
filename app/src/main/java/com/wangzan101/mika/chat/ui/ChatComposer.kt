@@ -123,8 +123,10 @@ internal fun Composer(
     onVoiceSend: ((String) -> Unit)? = null,
     /** The "choose" action in "voice input not available yet": pick speech-to-text in settings. */
     onPickSpeech: () -> Unit = {},
-    /** The handset button: enters a voice call; hidden when null. */
-    /** Who words spoken while a task runs are given to: the top of the card says "Speak to '…'". */
+    /** 「还不能语音输入」里的「下载离线语音包」:到离线语音包那一页。 */
+    onOpenVoicePacks: () -> Unit = {},
+    /** 听筒按钮:进语音通话;为 null 时不显示。 */
+    /** 任务在跑时说的话交给谁:卡片顶上写「插话给『…』」。 */
     steerTarget: String? = null,
     /** True while holding to talk: the conversation content blurs along with it. */
     onVoiceHolding: (Boolean) -> Unit = {},
@@ -310,7 +312,7 @@ internal fun Composer(
             }
             if (vh != null) VoiceBarCover(vh, vState, reduceMotion, Modifier.matchParentSize())
             }
-            if (vh != null) VoiceSheetHost(vh, onPickSpeech)
+            if (vh != null) VoiceSheetHost(vh, onPickSpeech, onOpenVoicePacks)
         }
     }
 }

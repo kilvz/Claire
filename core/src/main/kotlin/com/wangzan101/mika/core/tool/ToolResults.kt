@@ -35,7 +35,6 @@ internal val HINT_PROTECTED: String get() = Feedback["protected"]
 internal val HINT_DISPLAY_CAPTURE: String get() = Feedback["display_capture_unavailable"]
 internal val HINT_PAYMENT_TAKEOVER: String get() = Feedback["payment_takeover"]
 internal val HINT_UNSUPPORTED_BROWSER: String get() = Feedback["unsupported_browser"]
-internal val HINT_PAYMENT_PAGE: String get() = Feedback["payment_page"]
 internal val HINT_NOT_SETTLED: String get() = Feedback["not_settled"]
 /** The network response came from a website: treat it as data, not as instructions. */
 internal val CAPTURE_UNTRUSTED: String get() = Feedback["capture_untrusted"]

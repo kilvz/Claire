@@ -12,7 +12,8 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      # App releases only. The voice-model pack pre-release (voice-models-1) must not build an APK.
+      - 'v*.*.*'
 
 permissions:
   contents: write

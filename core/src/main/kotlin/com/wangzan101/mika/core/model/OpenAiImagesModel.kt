@@ -78,7 +78,7 @@ class OpenAiImagesModel(
         }
         return Request.Builder().url("$root/images/generations")
             .withHeaders(headers)
-            .apply { if (!apiKey.isNullOrEmpty()) header("Authorization", "Bearer $apiKey") }
+            .apply { if (!apiKey.isNullOrEmpty()) headerOrReject("Authorization", "Bearer $apiKey") }
             .postInference(InferenceProtocol.Chat, payload)
             .build()
     }
@@ -96,7 +96,7 @@ class OpenAiImagesModel(
         }
         return Request.Builder().url("$root/images/edits")
             .withHeaders(headers)
-            .apply { if (!apiKey.isNullOrEmpty()) header("Authorization", "Bearer $apiKey") }
+            .apply { if (!apiKey.isNullOrEmpty()) headerOrReject("Authorization", "Bearer $apiKey") }
             .post(body.build())
             .build()
     }

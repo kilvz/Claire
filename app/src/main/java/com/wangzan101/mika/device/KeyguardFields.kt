@@ -3,10 +3,10 @@ package com.wangzan101.mika.device
 import com.wangzan101.mika.core.device.CredentialKind
 
 /**
- * General rule: only input fields carrying the password flag inside SystemUI are accepted; for editable fields, PIN (numeric) and password (non-numeric) are told apart by the input type.
- * The stock Android lock screen draws its own PIN field (`pinEntry` / `PasswordTextView`), which does not declare editable, so it is let through only by this set of stock names.
- * When an editable field declares no input type (TYPE_NULL, the page draws the keyboard itself), look for a complete 0–9 numeric keypad in the same window: if there is one it is a PIN page, otherwise it counts as a password page.
- * All other non-editable controls and SIM PIN are never accepted; when it is not certain, no input is made.
+ * 通用规则:只认 SystemUI 里带密码标志的输入框;编辑框按输入类型区分 PIN(数字)和密码(非数字)。
+ * 安卓原版锁屏的 PIN 框是自己画的(`pinEntry` / `PasswordTextView`),不论是否声明 editable,只按原版的这组名字认作 PIN。
+ * 编辑框没声明输入类型(TYPE_NULL,键盘由页面自己画)时看同一窗口里有没有 0–9 齐全的数字键:有就是 PIN 页,没有按密码页算。
+ * 其余不可编辑的控件、SIM PIN 一律不认,认不准就不输入。
  */
 internal object KeyguardFields {
     fun matches(kind: CredentialKind, id: String, className: String, password: Boolean, editable: Boolean, numeric: Boolean,
@@ -17,7 +17,8 @@ internal object KeyguardFields {
         val pinField = numeric || untyped && digitPad
         return when (kind) {
             CredentialKind.Pin -> pinView || editable && pinField
-            CredentialKind.Password -> editable && !pinField
+            // 原版 PIN 框在有的系统上报成 editable 却不报数字类型,它仍只是 PIN 框,不能两种都认。
+            CredentialKind.Password -> editable && !pinField && !pinView
         }
     }
 

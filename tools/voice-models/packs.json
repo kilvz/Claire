@@ -1,0 +1,54 @@
+{
+  "packs": [
+    {
+      "id": "whisper-base-int8",
+      "version": 1,
+      "backend": "sherpa-onnx",
+      "family": "whisper",
+      "displayName": "Whisper Base",
+      "languages": [
+        "en",
+        "id"
+      ],
+      "recommendedFor": [
+        "en",
+        "id"
+      ],
+      "hfRepo": "csukuangfj/sherpa-onnx-whisper-base",
+      "commit": "bb53ee204431c90d314c1cc08d28d23e5b7927cc",
+      "files": [
+        {
+          "name": "base-encoder.int8.onnx",
+          "role": "encoder",
+          "size": 29120534,
+          "sha256": "0b8fb1304b6109976038efff5ace81720e00386f3ff6b54ee8c75291ca0a1e11"
+        },
+        {
+          "name": "base-decoder.int8.onnx",
+          "role": "decoder",
+          "size": 130672026,
+          "sha256": "9759d217388a01b3a4c7c15533201067b48ae819c4daafc8624e64b9409dc02d"
+        },
+        {
+          "name": "base-tokens.txt",
+          "role": "tokens",
+          "size": 816730,
+          "sha256": "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126"
+        },
+        {
+          "name": "LICENSE",
+          "role": "license",
+          "size": 1063,
+          "sha256": "b5d65a59060e68c4ff940e1eddfa6f94b2d68fdf58ed7f4dd57721c997e35e9d",
+          "url": "https://raw.githubusercontent.com/openai/whisper/6e3be77e1a105e59086e3e21ff5f609fd6fa89a5/LICENSE"
+        }
+      ],
+      "license": {
+        "name": "MIT",
+        "file": "LICENSE",
+        "attribution": "Whisper by OpenAI, https://github.com/openai/whisper (Copyright (c) 2022 OpenAI); ONNX export by k2-fsa/sherpa-onnx"
+      },
+      "note": "HF repo has no LICENSE file. Weights are released under MIT with openai/whisper code (the openai/whisper-base HF card says apache-2.0; we follow the original GitHub release, MIT). Not under `upstream`. Whisper language codes are Whisper's own: Hebrew=iw, Javanese=jw."
+    }
+  ]
+}

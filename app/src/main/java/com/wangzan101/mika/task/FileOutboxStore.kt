@@ -47,7 +47,7 @@ class FileOutboxStore(private val file: File) : OutboxStore {
             }
         }.onFailure {
             Log.e("MikaOutbox", "outbox could not be read; preserving damaged file", it)
-            file.copyTo(File(file.parentFile, file.name + ".corrupt"), overwrite = true)
+            file.keepCorruptCopy()
             records.clear()
         }
     }

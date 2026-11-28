@@ -38,10 +38,16 @@ android {
         buildConfigField("boolean", "ADB_LOGS", "false")
     }
 
-    // The sandbox binary only has an arm64 build (jniLibs/arm64-v8a); the APK is not ABI-restricted, so
-    // other devices still install it and show "this device does not support the sandbox".
-    // The sandbox binary is executed straight from nativeLibraryDir, so it must be extracted to disk on install
-    packaging { jniLibs { useLegacyPackaging = true } }
+    // 沙箱程序只有 arm64 版本(jniLibs/arm64-v8a);APK 不限 ABI,别的设备照常安装、显示「此设备不支持沙箱」。
+    // 沙箱程序要从 nativeLibraryDir 直接执行,安装时必须解到磁盘
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            // 离线识别(sherpa-onnx AAR)只用 arm64-v8a;AAR 里另外几种架构的库不打进 APK,别的设备显示「此设备不支持离线识别」。
+            // 按文件名前缀排除(以后版本多出的 sherpa/onnxruntime 库也排除);不整目录排除,ML Kit 等别的库这些架构照常带
+            excludes += listOf("armeabi-v7a", "x86", "x86_64").flatMap { abi -> listOf("lib/$abi/libsherpa-onnx*.so", "lib/$abi/libonnxruntime*.so") }
+        }
+    }
 
     // Published builds (perf, release) also get a per-architecture variant: besides the universal APK,
     // a smaller APK carrying only the arm64-v8a native libraries.
@@ -171,8 +177,8 @@ dependencies {
     implementation(libs.zxing.core)
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
-    // On-device streaming speech recognition (sherpa-onnx); see voice/SherpaOnnx.kt.
-    implementation(libs.sherpa.onnx)
+    // 离线语音识别:sherpa-onnx 2.0.3(静态链接 onnxruntime),不在 Maven 上,放在 app/libs,校验值见 app/libs/README.md
+    implementation(files("libs/sherpa-onnx-2.0.3-static.aar"))
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -183,8 +189,6 @@ dependencies {
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
-    // Older transitive Espresso reflects on InputManager.getInstance(), removed on newer devices.
-    androidTestImplementation(libs.androidx.test.espresso)
     debugImplementation(libs.compose.ui.test.manifest)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
@@ -194,20 +198,12 @@ dependencies {
     androidTestImplementation(libs.junit)
 }
 
-// The coroutine test helpers (runTest schedulers, advanceUntilIdle) and a few serialization knobs are still marked
-// experimental; opt in only for the test compilations so production code keeps the stricter check.
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    if (name.contains("UnitTest") || name.contains("AndroidTest")) {
-        compilerOptions.optIn.set(
-            listOf(
-                "kotlinx.coroutines.ExperimentalCoroutinesApi",
-                "kotlinx.serialization.ExperimentalSerializationApi",
-            ),
-        )
-    }
+// JVM 单测只在 debug 上跑:release/perf/logs 的代码与 debug 相同,各编一遍、跑一遍只是重复(裸 :app:test 还会因此内存不够)
+androidComponents {
+    beforeVariants { variant -> if (variant.buildType != "debug") variant.enableUnitTest = false }
 }
 
-// LicensesTest reads the repo's licenses/THIRD_PARTY_NOTICES.md: make it part of the test up-to-date check
+// LicensesTest 读仓库的 licenses/THIRD_PARTY_NOTICES.md:让它参与测试的增量判断
 tasks.withType<Test>().configureEach {
     inputs.file(rootProject.file("licenses/THIRD_PARTY_NOTICES.md")).withPropertyName("thirdPartyNotices")
 }

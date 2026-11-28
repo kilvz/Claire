@@ -30,7 +30,7 @@ private class FakeSpeechSession(flow: Flow<SpeechEvent>) : SpeechSession {
     override fun cancel() {}
 }
 
-/** A live, unlimited session: it only finishes when released, like sherpa-onnx and streaming vendors. */
+/** A live, unlimited session: it only finishes when released, like the streaming vendors. */
 private class LiveFakeSession : SpeechSession {
     private val channel = Channel<SpeechEvent>(Channel.UNLIMITED)
     override val events: Flow<SpeechEvent> = channel.receiveAsFlow()
@@ -152,17 +152,6 @@ class VoiceModelProbeTest {
             states,
         )
         assertTrue(session.released)
-    }
-
-    @Test fun `a missing sherpa model probe explains the download`() = runTest {
-        val session = FakeSpeechSession(flowOf(SpeechEvent.Failed(
-            SpeechFailure.Unavailable(com.wangzan101.mika.voice.SpeechEngineSpec.Why.SherpaModelMissing),
-        )))
-        val probe = probe(startStt = { session })
-
-        val failed = probe.verifyStt(ref).toList().single() as VoiceProbeState.Failed
-
-        assertTrue(failed.error.detail.contains("isn't ready"))
     }
 
     @Test fun `verifyTts returns the synthesized audio`() = runTest {

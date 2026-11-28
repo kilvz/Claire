@@ -309,6 +309,7 @@ class VoiceCallController(
                             language = null,
                             prior = deps.turns(conversation),
                             background = deps.desks.background(conversation),
+                            meter = deps.meter(conversation),
                         ).also { currentRealtime = it }
                     } catch (e: VoiceModelError) {
                         throw VolcRealtimeException(VolcRealtimeException.Kind.AUTH)
@@ -449,6 +450,8 @@ class VoiceCallDeps(
     val screens: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
     /** The live picture of that task's (conversation id's) screen; null when nothing is running. */
     val frames: (String) -> StateFlow<Bitmap?>? = { null },
+    /** 对话用量计量器;标准模式通话记入这条对话。 */
+    val meter: (String) -> com.wangzan101.mika.core.model.usage.ConversationMeter? = { null },
 )
 
 /** The call controller: shared by the host ([VoiceCallHost]) and the call page ([VoiceCallScreen]), living outside navigation. */

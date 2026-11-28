@@ -93,14 +93,6 @@ private fun SpeechFailure.toError(): VoiceModelError = when (this) {
         VoiceErrorCategory.SYSTEM_UNAVAILABLE, "Recognition service lacks microphone permission",
     )
     is SpeechFailure.Unavailable -> VoiceModelError.Protocol(
-        VoiceErrorCategory.SYSTEM_UNAVAILABLE,
-        when (why) {
-            SpeechEngineSpec.Why.SherpaModelMissing ->
-                "The on-device model isn't ready yet. Download it in Settings › Models › Speech models and wait for it to finish."
-            SpeechEngineSpec.Why.SherpaFailed ->
-                "The on-device recognition engine could not start."
-            SpeechEngineSpec.Why.Off -> "Voice input is turned off."
-            else -> "Speech recognition is unavailable"
-        },
+        VoiceErrorCategory.SYSTEM_UNAVAILABLE, "Speech recognition is unavailable",
     )
 }

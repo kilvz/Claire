@@ -9,6 +9,7 @@ import com.wangzan101.mika.core.model.ChatModel
 import com.wangzan101.mika.core.model.ToolSpec
 import com.wangzan101.mika.core.model.TtsCapabilities
 import com.wangzan101.mika.core.model.TtsRequest
+import com.wangzan101.mika.core.model.usage.ConversationMeter
 import com.wangzan101.mika.frontdesk.deskModel
 import com.wangzan101.mika.settings.VoiceSettings
 import com.wangzan101.mika.voice.Pcm16
@@ -21,6 +22,7 @@ import com.wangzan101.mika.voice.model.VoiceModelError
 import com.wangzan101.mika.voice.model.VoiceModelRef
 import com.wangzan101.mika.voice.model.VoiceSelections
 import com.wangzan101.mika.voice.model.adapters.SttHooks
+import com.wangzan101.mika.voice.ondevice.OnDeviceCatalog
 
 /** Which call is asking: the in-app voice call or an AI phone call (which may have its own models). */
 enum class CallUse { InApp, Phone }
@@ -40,11 +42,20 @@ class CascadeEngine(private val context: Context, private val environment: Voice
         CallUse.Phone -> selections.resolvedCallEngine
     }
 
+    /**
+     * 通话听写用哪个模型。手机自带识别听不到通话的声音;本机语音包第一版也不用(出字太慢,
+     * 比如 Whisper 5 秒语音要 4 秒左右),只有它们时得到 [StandardBlocker.NoListenModel]。
+     */
     fun listenRef(use: CallUse): VoiceModelRef? {
-        val shared = (selections.stt as? SttSelection.Model)?.ref?.takeIf { it != SttSelectionController.SYSTEM_STT_REF }
+        val shared = (selections.stt as? SttSelection.Model)?.ref
+            ?.takeIf { it != SttSelectionController.SYSTEM_STT_REF && !OnDeviceCatalog.isOnDevice(it) }
         return when (use) {
             CallUse.InApp -> shared
-            CallUse.Phone -> selections.callStt ?: shared
+            CallUse.Phone -> when (val own = selections.callStt) {
+                null -> shared
+                // AI 电话自己选的是语音包:照实说没有可用的,不悄悄改用语音输入那一个
+                else -> own.takeUnless(OnDeviceCatalog::isOnDevice)
+            }
         }
     }
 
@@ -91,6 +102,7 @@ class CascadeEngine(private val context: Context, private val environment: Voice
         language: String?,
         prior: List<Turn> = emptyList(),
         background: DeskBackground? = null,
+        meter: ConversationMeter? = null,
     ): CascadeVoiceSession {
         blocker(use)?.let { throw VoiceModelError.IncompleteConfig("Standard call is not ready: $it") }
         val listen = listenRef(use)!!
@@ -98,12 +110,13 @@ class CascadeEngine(private val context: Context, private val environment: Voice
         val think = thinkModel() ?: throw VoiceModelError.IncompleteConfig("No chat model")
         // When the selected model is the one used for read-aloud/voice input, carry its fallback chain (see backupsFor); a model chosen separately for AI calls carries none
         val tts = environment.tts.createSpeaker(context, speakRef, TtsCapabilities())
-        val listenBackups = environment.stt.backupsFor(listen)
+        // 备援链里的本机语音包通话也不用
+        val listenBackups = environment.stt.backupsFor(listen).filterNot(OnDeviceCatalog::isOnDevice)
         val voice = voice(use)
         val speed = VoiceSettings.get(context).state.value.speed.takeIf { it > 0f && it != 1f }
         // The spoken-style note is only added once: the front desk's spoken-style prompt already carries it.
         val system = if (instructions.startsWith(LlmBrain.SPOKEN_STYLE)) instructions else LlmBrain.SPOKEN_STYLE + "\n\n" + instructions
-        val brain = LlmBrain(think, system, tools, background = background, log = { Log.w(TAG, it) })
+        val brain = LlmBrain(think, system, tools, background = background, log = { Log.w(TAG, it) }, recordRequest = use == CallUse.InApp)
         brain.seed(prior)
         val s = selections
         return CascadeVoiceSession(
@@ -117,6 +130,7 @@ class CascadeEngine(private val context: Context, private val environment: Voice
             },
             silenceMs = s.silenceMs.coerceIn(VoiceSelections.MIN_SILENCE_MS, VoiceSelections.MAX_SILENCE_MS),
             bargeIn = s.bargeIn,
+            meter = meter,
         )
     }
 

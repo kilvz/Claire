@@ -8,6 +8,7 @@
     <string name="voice_steer_to">در حال گفتن به «%1$s»</string>
     <string name="voice_engine_phone">گوشی</string>
     <string name="voice_engine_phone_offline">گوشی · آفلاین</string>
+    <string name="voice_engine_on_device">روی دستگاه · آفلاین</string>
     <string name="voice_say_now">بفرمایید، گوش می‌دهم…</string>
     <string name="voice_recording">در حال ضبط. رها کنید تا به متن تبدیل شود…</string>
     <string name="voice_foot_live">رها کنید · کلمات برای ویرایش وارد کادر می‌شوند</string>
@@ -40,6 +41,8 @@
     <string name="voice_service_settings_failed">صفحهٔ تنظیمات «%1$s» باز نشد. آن را در فهرست برنامه‌های سیستم پیدا کنید و میکروفون را روشن کنید.</string>
     <string name="voice_unavailable_provider_gone">ارائه‌دهندهٔ مدل گفتاری انتخاب‌شده حذف شده است. گزینهٔ دیگری در تنظیمات › مدل‌ها › گفتار به متن انتخاب کنید.</string>
     <string name="voice_unavailable_off">گفتار به متن خاموش است. یک گزینه در تنظیمات › مدل‌ها › گفتار به متن انتخاب کنید.</string>
+    <string name="voice_unavailable_pack_missing">باید بستهٔ صوتی را دانلود کنید. بستهٔ صوتی آفلاینی که انتخاب کرده‌اید روی این گوشی نیست؛ آن را در تنظیمات › مدل‌ها › گفتار به متن دانلود کنید تا بدون انتخاب دوباره فوراً کار کند.</string>
+    <string name="voice_unavailable_on_device_unsupported">این دستگاه از تشخیص آفلاین پشتیبانی نمی‌کند. روش تشخیص دیگری را در تنظیمات › مدل‌ها › گفتار به متن انتخاب کنید.</string>
     <string name="voice_go_pick">انتخاب</string>
     <string name="voice_permission_title">Claire به میکروفون نیاز دارد</string>
     <string name="voice_permission_body">برای شنیدن صدای شما هنگام نگه داشتن دکمهٔ صحبت، Claire باید صدا ضبط کند. این مجوز قبلاً رد شده و گوشی دیگر دوباره نمی‌پرسد. میکروفون را در صفحهٔ مجوزهای Claire در تنظیمات سیستم روشن کنید.</string>
@@ -65,7 +68,4 @@
     <string name="capsule_voice_not_ready">ورودی صوتی آماده نیست · بزنید</string>
     <string name="capsule_voice_service_need_mic">تشخیص گفتار هنوز نمی‌تواند ضبط کند · بزنید</string>
     <string name="capsule_voice_open">باز کردن Claire</string>
-    <string name="voice_unavailable_sherpa_missing">تبدیل گفتار به متن روی مدل Sherpa-ONNX که روی دستگاه اجرا می‌شود تنظیم شده، اما هنوز دانلود نشده است. آن را از «تنظیمات › مدل‌ها › مدل‌های صدا» دانلود کنید یا روش تشخیص دیگری انتخاب کنید.</string>
-    <string name="voice_unavailable_sherpa_failed">موتور Sherpa-ONNX روی دستگاه اجرا نشد. دوباره امتحان کنید یا از «تنظیمات › مدل‌ها › گفتار به متن» روش دیگری انتخاب کنید.</string>
-    <string name="voice_engine_sherpa">Sherpa-ONNX · روی دستگاه</string>
 </resources>

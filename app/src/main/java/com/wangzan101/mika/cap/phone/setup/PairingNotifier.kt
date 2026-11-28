@@ -143,8 +143,8 @@ object PairingNotifier {
     private const val INPUT_TIMEOUT_MS = 10 * 60_000L
     private const val TAG = "MikaPairing"
     /**
-     * The quietly prepared code-entry notification is put in a group of its own with only the group summary allowed to alert: with no summary in the group it neither rings nor pops up (the mute trick at minSdk 30,
-     * the same approach AndroidX's setSilent takes on older systems). No separate low-importance channel is created: some systems fold low-importance notifications into "less important notifications", where they are hard to find.
+     * 静静备好的填码通知单放一组、只让组摘要出声:组里没有摘要,它就不响不弹(minSdk 29 上的静音办法,
+     * 和 AndroidX 的 setSilent 在旧系统上的做法一样)。不另建低优先级频道:有的系统把低优先级通知折进「不重要的通知」,不好找。
      */
     private const val QUIET_GROUP = "pairing_quiet"
 
@@ -212,7 +212,7 @@ object PairingNotifier {
                 .setAutoCancel(true).setOnlyAlertOnce(true).setTimeoutAfter(DONE_TIMEOUT_MS)
             is PairingNotice.Problem -> b.setContentTitle(notice.title).setContentText(PhoneSetupCopy.NOTIFY_PROBLEM_TEXT).setAutoCancel(true)
         }
-        // The quiet one: placed in the shade without ringing or popping up (even on a high-importance channel; minSdk 30 has no setSilent)
+        // 静静备好的那个:放进通知栏,不响不弹(高优先级频道上也是,minSdk 29 没有 setSilent)
         if (notice is PairingNotice.EnterCode && notice.quiet) b.setOnlyAlertOnce(true).setGroup(QUIET_GROUP).setGroupAlertBehavior(Notification.GROUP_ALERT_SUMMARY)
         // Without notification permission the system drops it; the guide page asks the user to allow it first at the pairing step
         runCatching { nm.notify(ID, b.build()) }.onFailure { Log.w(TAG, "pairing notification not posted", it) }

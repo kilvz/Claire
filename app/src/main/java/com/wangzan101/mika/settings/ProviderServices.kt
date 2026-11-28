@@ -77,11 +77,7 @@ internal fun ProviderStore.proactiveConfig(): Pair<ModelRole, ProviderConfig>? =
 
 internal fun ProviderStore.targetOf(cfg: ProviderConfig) = TriageTarget(cfg.providerId, provider(cfg.providerId)?.name ?: cfg.name, cfg.model)
 
-internal fun ProviderStore.meteredFor(
-    role: ModelRole, session: ModelSession, purpose: UsagePurpose, beforeCall: (UsageSource) -> Unit,
-): ChatModel? = configFor(role)?.let { cfg -> meteredWith(cfg, role, session, purpose, beforeCall) }
-
-/** Build a model from [cfg] (the config already resolved for [role]) with metering applied. [effortOverride] is the per-member reasoning level within a group. */
+/** 用 [cfg](已按 [role] 取出的那条配置)建模型,套好计量。[effortOverride] 为组里成员各自的思考档位。 */
 internal fun ProviderStore.meteredWith(
     cfg: ProviderConfig, role: ModelRole, session: ModelSession, purpose: UsagePurpose, beforeCall: (UsageSource) -> Unit,
     call: ProactiveCall = ProactiveCall.Triage,

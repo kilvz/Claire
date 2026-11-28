@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="models_voice_catalog">음성 모델</string>
-    <string name="models_voice_catalog_sub">음성 인식, 음성 합성, 실시간 통화 모델을 한곳에서 관리</string>
     <string name="voice_catalog_title">음성 모델</string>
     <string name="voice_catalog_sub">음성 인식, 음성 합성, 실시간 통화 모델을 한곳에서 관리합니다. 기능과 프로토콜은 여기에서 선언하며, 음성 입력·읽어주기·통화 설정 페이지에서는 선택과 사용 환경설정만 다룹니다.</string>
     <string name="voice_catalog_add">모델 추가</string>
@@ -45,6 +44,7 @@
     <string name="voice_catalog_listening">듣는 중입니다. 말씀해 주세요…</string>
     <string name="voice_catalog_incomplete">먼저 계정 정보를 입력하세요</string>
     <string name="voice_catalog_protocol_stt_android_system">Android 시스템</string>
+    <string name="voice_catalog_protocol_stt_ondevice">기기 내</string>
     <string name="voice_catalog_protocol_stt_audio_transcriptions">오디오 전사</string>
     <string name="voice_catalog_protocol_stt_chat_input_audio">채팅 음성 입력</string>
     <string name="voice_catalog_protocol_stt_gemini_inline">Gemini 인라인</string>
@@ -59,14 +59,4 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">Volc 듀플렉스</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI 실시간</string>
     <string name="voice_catalog_tts_sample">안녕하세요, 음성 테스트입니다.</string>
-    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX(기기 내)</string>
-    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX 영어(기기 내)</string>
-    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX 다국어(다운로드)</string>
-    <string name="voice_catalog_sherpa_download">다운로드(%1$s)</string>
-    <string name="voice_catalog_sherpa_downloading">다운로드 중… %1$d%%</string>
-    <string name="voice_catalog_sherpa_unpacking">모델을 푸는 중…</string>
-    <string name="voice_catalog_sherpa_downloaded">모델 다운로드 완료</string>
-    <string name="voice_catalog_sherpa_download_failed">다운로드 실패: %1$s</string>
-    <string name="voice_catalog_sherpa_retry">다시 다운로드</string>
-    <string name="voice_catalog_sherpa_needs_download">모델을 먼저 다운로드해야 합니다.</string>
 </resources>

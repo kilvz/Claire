@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="models_voice_catalog">مدل‌های گفتار</string>
-    <string name="models_voice_catalog_sub">مدیریت مدل‌های گفتار به متن، متن به گفتار و تماس زنده در یک‌جا</string>
     <string name="voice_catalog_title">مدل‌های گفتار</string>
     <string name="voice_catalog_sub">مدیریت مدل‌های گفتار به متن، متن به گفتار و تماس زنده در یک‌جا. قابلیت‌ها و پروتکل‌ها این‌جا اعلام می‌شوند؛ صفحات ورودی صوتی، خواندن و تماس فقط ترجیحات را انتخاب و استفاده می‌کنند.</string>
     <string name="voice_catalog_add">افزودن مدل</string>
@@ -45,6 +44,7 @@
     <string name="voice_catalog_listening">گوش می‌دهم، چیزی بگویید…</string>
     <string name="voice_catalog_incomplete">ابتدا جزئیات حساب مورد نیاز را وارد کنید.</string>
     <string name="voice_catalog_protocol_stt_android_system">سیستم Android</string>
+    <string name="voice_catalog_protocol_stt_ondevice">روی دستگاه</string>
     <string name="voice_catalog_protocol_stt_audio_transcriptions">رونوشت صدا</string>
     <string name="voice_catalog_protocol_stt_chat_input_audio">صدای ورودی چت</string>
     <string name="voice_catalog_protocol_stt_gemini_inline">Gemini داخلی</string>
@@ -59,14 +59,4 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">Volc دوطرفه</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI بلادرنگ</string>
     <string name="voice_catalog_tts_sample">سلام، این یک آزمایش صوتی است.</string>
-    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX (روی دستگاه)</string>
-    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX انگلیسی (روی دستگاه)</string>
-    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX چندزبانه (دانلود)</string>
-    <string name="voice_catalog_sherpa_download">دانلود (%1$s)</string>
-    <string name="voice_catalog_sherpa_downloading">در حال دانلود… %1$d%%</string>
-    <string name="voice_catalog_sherpa_unpacking">در حال باز کردن مدل…</string>
-    <string name="voice_catalog_sherpa_downloaded">مدل دانلود شد</string>
-    <string name="voice_catalog_sherpa_download_failed">دانلود ناموفق: %1$s</string>
-    <string name="voice_catalog_sherpa_retry">دانلود دوباره</string>
-    <string name="voice_catalog_sherpa_needs_download">ابتدا باید مدل دانلود شود.</string>
 </resources>

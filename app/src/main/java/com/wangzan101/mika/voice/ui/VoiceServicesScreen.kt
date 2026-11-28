@@ -1,5 +1,6 @@
 package com.wangzan101.mika.voice.ui
 
+import com.wangzan101.mika.voice.ondevice.OnDeviceCatalog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -76,8 +77,23 @@ import com.wangzan101.mika.settings.ui.models.Page
 import com.wangzan101.mika.settings.ui.models.pick
 import com.wangzan101.mika.settings.ui.models.refresh
 import com.wangzan101.mika.settings.ui.models.use
+import com.wangzan101.mika.ui.NavSlide
+import com.wangzan101.mika.ui.rememberPageStates
 
 private enum class PresetKind { Compatible, SelfHosted }
+
+private sealed interface VoiceServicePage {
+    val depth: Int
+    val key: String
+    data object Home : VoiceServicePage { override val depth = 0; override val key = "list" }
+    data class Detail(val serviceId: String) : VoiceServicePage { override val depth = 1; override val key = "detail:$serviceId" }
+    data class Vendor(val vendorId: String, val fromDetail: Boolean) : VoiceServicePage {
+        override val depth = if (fromDetail) 2 else 1
+        override val key = "vendor:$vendorId"
+    }
+    data class Preset(val kind: PresetKind) : VoiceServicePage { override val depth = 1; override val key = "preset:${kind.name}" }
+    data class Result(val refs: List<VoiceModelRef>) : VoiceServicePage { override val depth = 2; override val key = "result" }
+}
 
 /**
  * "Voice services": every account voice draws on. Built-in vendors ask for their own fields once and bring all their
@@ -112,25 +128,35 @@ fun VoiceServicesScreen(store: ProviderStore, onBack: () -> Unit, onOpenCustom: 
         listedThisRun.remove(plan.service.id)
     }
     BackHandler(enabled = vendorForm != null || detail != null || preset != null || results != null) { back() }
-    when {
-        results != null -> PresetResult(snapshot, results, viewModel, voiceModels, onDone = {
-            // After saving, return to this vendor's detail page to see all the models it brings
-            detail = results.firstOrNull()?.serviceId ?: detail
-            saved = null; preset = null; vendorForm = null
-        })
-        preset != null -> PresetForm(requireNotNull(preset), back, ::apply)
-        vendorForm != null -> VoiceVendors.byId(requireNotNull(vendorForm))?.let { VendorForm(it, back, ::apply) } ?: back()
-        detail != null -> {
-            val service = snapshot.services.firstOrNull { it.id == detail }
-            if (service == null) back()
-            else VendorDetail(snapshot, service, voiceModels, back,
-                onChangeKey = VoiceVendors.forService(service.id)?.takeIf { it.builds(service.id) }?.let { vendor -> { vendorForm = vendor.id } } ?: onOpenCustom,
-                onTest = { saved = listOf(encodeRef(it)) })
+    val pageStates = rememberPageStates()
+    val currentPage: VoiceServicePage = when {
+        results != null -> VoiceServicePage.Result(results)
+        preset != null -> VoiceServicePage.Preset(requireNotNull(preset))
+        vendorForm != null -> VoiceServicePage.Vendor(requireNotNull(vendorForm), fromDetail = detail != null)
+        detail != null -> VoiceServicePage.Detail(requireNotNull(detail))
+        else -> VoiceServicePage.Home
+    }
+    NavSlide(currentPage, depth = { it.depth }, states = pageStates, pageKey = { it.key }) { page ->
+        when (page) {
+            is VoiceServicePage.Result -> PresetResult(snapshot, page.refs, viewModel, voiceModels, onDone = {
+                // 存完回到这家服务商的详情,看它带来的全部模型
+                detail = page.refs.firstOrNull()?.serviceId ?: detail
+                saved = null; preset = null; vendorForm = null
+            })
+            is VoiceServicePage.Preset -> PresetForm(page.kind, back, ::apply)
+            is VoiceServicePage.Vendor -> VoiceVendors.byId(page.vendorId)?.let { VendorForm(it, back, ::apply) } ?: back()
+            is VoiceServicePage.Detail -> {
+                val service = snapshot.services.firstOrNull { it.id == page.serviceId }
+                if (service == null) back()
+                else VendorDetail(snapshot, service, voiceModels, back,
+                    onChangeKey = VoiceVendors.forService(service.id)?.takeIf { it.builds(service.id) }?.let { vendor -> { vendorForm = vendor.id } } ?: onOpenCustom,
+                    onTest = { saved = listOf(encodeRef(it)) })
+            }
+            VoiceServicePage.Home -> ServiceList(
+                snapshot, providers, back,
+                onVendor = { vendorForm = it.id }, onService = { detail = it }, onPreset = { preset = it }, onOpenCustom = onOpenCustom,
+            )
         }
-        else -> ServiceList(
-            snapshot, providers, back,
-            onVendor = { vendorForm = it.id }, onService = { detail = it }, onPreset = { preset = it }, onOpenCustom = onOpenCustom,
-        )
     }
 }
 
@@ -173,7 +199,7 @@ private fun ServiceList(
     val c = MikaTheme.colors
     val own = snapshot.services.filter {
         it.account !is VoiceAccount.ExistingProvider && it.id != SttSelectionController.SYSTEM_STT_SERVICE.id &&
-            it.id != TtsSelectionController.SYSTEM_TTS_REF.serviceId
+            it.id != TtsSelectionController.SYSTEM_TTS_REF.serviceId && it.id != OnDeviceCatalog.SERVICE_ID
     }
     val unconnected = VoiceVendors.all.filter { vendor -> own.none { vendor.owns(it.id) } }
     Page(stringResource(R.string.voice_hub_services), onBack) {
@@ -573,7 +599,6 @@ private fun PresetResult(
                 val model = snapshot.modelOf(ref) ?: return@forEachIndexed
                 val probe = viewModel.probeFingerprint(ref)?.let { probes[it] } ?: VoiceProbeUi.Idle
                 val stoppable = probe is VoiceProbeUi.Listening && viewModel.canStopStt(ref)
-                val preparing = sherpaPreparing(ref.modelId)
                 val inUse = when (ref.capability) {
                     VoiceCapability.STT -> snapshot.selections.stt == SttSelection.Model(ref)
                     VoiceCapability.TTS -> snapshot.selections.tts == ref
@@ -597,7 +622,7 @@ private fun PresetResult(
                             }
                         },
                         kind = ButtonKind.Tonal, size = ButtonSize.Small,
-                        enabled = !preparing && (stoppable || (probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening)),
+                        enabled = stoppable || (probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening),
                     )
                 }
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

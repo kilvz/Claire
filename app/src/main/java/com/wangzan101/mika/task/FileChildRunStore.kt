@@ -17,7 +17,7 @@ class FileChildRunStore(private val file: File) : ChildRunStore {
         if (file.isFile) runCatching { Json.decodeFromString<List<ChildRecord>>(file.readText()) }.onSuccess { loaded ->
             loaded.forEach { records[it.id] = if (it.phase == ChildPhase.Running) it.copy(phase = ChildPhase.Unknown) else it }
             if (loaded.any { it.phase == ChildPhase.Running }) persist()
-        }.onFailure { file.copyTo(File(file.parentFile, file.name + ".corrupt"), overwrite = true) }
+        }.onFailure { file.keepCorruptCopy() }
     }
 
     @Synchronized override fun save(record: ChildRecord) { records[record.id] = record; persist() }

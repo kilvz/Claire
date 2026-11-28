@@ -244,24 +244,31 @@ class VoicePlayer(private val context: Context) {
             // A new request arrived while writing the file: this generation is invalidated, no player is created and the state is untouched (the file is cleaned up by finally)
             if (!tickets.owns(ticket)) return
             file = f
-            val mp = MediaPlayer().apply {
-                setAudioAttributes(attributes)
-                setDataSource(f.absolutePath)
-                setOnPreparedListener { prepared ->
-                    if (!tickets.owns(ticket) || player !== prepared) return@setOnPreparedListener
-                    if (requestFocus(ticket, prepared)) {
-                        _state.value = VoicePlayback.Playing
-                        onStarted()
-                        prepared.start()
-                    } else {
-                        finishSegment(VoicePlayback.Error("audio focus is not available"))
+            val mp = MediaPlayer()
+            // 设置数据源等抛异常时 mp 还没交给 player,不在这里释放就漏掉原生播放器
+            try {
+                mp.apply {
+                    setAudioAttributes(attributes)
+                    setDataSource(f.absolutePath)
+                    setOnPreparedListener { prepared ->
+                        if (!tickets.owns(ticket) || player !== prepared) return@setOnPreparedListener
+                        if (requestFocus(ticket, prepared)) {
+                            _state.value = VoicePlayback.Playing
+                            onStarted()
+                            prepared.start()
+                        } else {
+                            finishSegment(VoicePlayback.Error("audio focus is not available"))
+                        }
+                    }
+                    setOnCompletionListener { if (tickets.owns(ticket) && player === it) finishSegment(VoicePlayback.Idle) }
+                    setOnErrorListener { failed, what, extra ->
+                        if (tickets.owns(ticket) && player === failed) finishSegment(VoicePlayback.Error("player error $what/$extra"))
+                        true
                     }
                 }
-                setOnCompletionListener { if (tickets.owns(ticket) && player === it) finishSegment(VoicePlayback.Idle) }
-                setOnErrorListener { failed, what, extra ->
-                    if (tickets.owns(ticket) && player === failed) finishSegment(VoicePlayback.Error("player error $what/$extra"))
-                    true
-                }
+            } catch (e: Throwable) {
+                mp.release()
+                throw e
             }
             player = mp
             mp.prepareAsync()

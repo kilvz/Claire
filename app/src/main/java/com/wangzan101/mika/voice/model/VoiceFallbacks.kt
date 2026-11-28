@@ -29,6 +29,8 @@ object VoiceFallbacks {
         SttProtocol.AzureShortAudio,
         SttProtocol.TencentSentence,
         SttProtocol.XfyunDictation,
+        // 本机语音包也是松手后整段转写:能当链头,也能当云端模型的备援
+        SttProtocol.OnDevice,
     )
 
     /** Whether [model] can join a [capability] fallback chain (and whether such a chain can hang off it). Real-time calls have no fallback chain. */

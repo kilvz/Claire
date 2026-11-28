@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="models_voice_catalog">語音模型</string>
-    <string name="models_voice_catalog_sub">統一管理語音轉文字、文字轉語音和實時通話的模型</string>
     <string name="voice_catalog_title">語音模型</string>
     <string name="voice_catalog_sub">統一管理語音轉文字、文字轉語音和實時通話的模型。能力與協定在此宣告；語音輸入、朗讀和通話設定頁只負責選擇與使用偏好。</string>
     <string name="voice_catalog_add">新增模型</string>
@@ -45,6 +44,7 @@
     <string name="voice_catalog_listening">正在聽，請說一句…</string>
     <string name="voice_catalog_incomplete">請先填寫帳號資訊</string>
     <string name="voice_catalog_protocol_stt_android_system">Android 系統</string>
+    <string name="voice_catalog_protocol_stt_ondevice">本機</string>
     <string name="voice_catalog_protocol_stt_audio_transcriptions">音訊轉錄</string>
     <string name="voice_catalog_protocol_stt_chat_input_audio">聊天語音輸入</string>
     <string name="voice_catalog_protocol_stt_gemini_inline">Gemini 內嵌</string>
@@ -59,14 +59,4 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">火山雙工</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI 即時</string>
     <string name="voice_catalog_tts_sample">你好，這是一次語音測試。</string>
-    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX（本機）</string>
-    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX 英語（本機）</string>
-    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX 多語言（需下載）</string>
-    <string name="voice_catalog_sherpa_download">下載（%1$s）</string>
-    <string name="voice_catalog_sherpa_downloading">正在下載… %1$d%%</string>
-    <string name="voice_catalog_sherpa_unpacking">正在解壓模型…</string>
-    <string name="voice_catalog_sherpa_downloaded">模型已下載</string>
-    <string name="voice_catalog_sherpa_download_failed">下載失敗：%1$s</string>
-    <string name="voice_catalog_sherpa_retry">重新下載</string>
-    <string name="voice_catalog_sherpa_needs_download">需要先下載這個模型。</string>
 </resources>

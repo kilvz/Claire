@@ -7,6 +7,7 @@ import com.wangzan101.mika.calls.VolcRealtimeCredentials
 import com.wangzan101.mika.calls.VolcRealtimeProtocol
 import com.wangzan101.mika.core.frontdesk.DeskBackground
 import com.wangzan101.mika.core.frontdesk.LlmBrain
+import com.wangzan101.mika.core.model.usage.ConversationMeter
 import com.wangzan101.mika.voice.model.VoiceModelError
 import kotlinx.serialization.json.JsonObject
 
@@ -20,6 +21,7 @@ class CascadeCallProvider(
     private val language: String? = null,
     /** The trailing note for the call's front desk (the state of the task this call belongs to), read once before every model call; null when there is no owning task. */
     private val background: DeskBackground? = null,
+    private val meter: ConversationMeter? = null,
 ) : CallRealtimeProvider {
     override fun validate(profile: CallVoiceProfile, systemPrompt: String, enablePhoneDtmf: Boolean) {
         engine.blocker(use)?.let { throw VoiceModelError.IncompleteConfig("Standard call is not ready: $it") }
@@ -33,6 +35,6 @@ class CascadeCallProvider(
     ): CallRealtimeSession {
         // Carrier phone call: keypad plus the phone front desk (ask-the-owner only)
         val tools = if (enablePhoneDtmf) VolcRealtimeProtocol.phoneCallTools().map { LlmBrain.toolSpec(it as JsonObject) } else emptyList()
-        return engine.open(use, systemPrompt, tools, language, background = background)
+        return engine.open(use, systemPrompt, tools, language, background = background, meter = meter)
     }
 }

@@ -237,8 +237,7 @@ internal fun ModelSetupViewModel.listFailure(e: Exception): ModelListResult.Fail
     else -> ModelListResult.Failed(ListFailure.of(e), e.message.orEmpty())
 }
 
-internal fun ModelSetupViewModel.listMessage(r: ModelListResult.Failed): String =
-    if (r.reason == ListFailure.IllegalKey) tr(R.string.model_key_illegal_chars) else r.message
+internal fun ModelSetupViewModel.listMessage(r: ModelListResult.Failed): String = ModelsCopy.listFailure(r)
 
 /** A user-facing line for failures other than listing. When a header value is illegal, the raw exception text (which may contain the Key) is not exposed. */
 internal fun ModelSetupViewModel.listFailureText(e: Exception): String = when (e) {

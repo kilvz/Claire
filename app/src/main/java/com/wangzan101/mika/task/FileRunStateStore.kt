@@ -43,15 +43,16 @@ class FileRunStateStore(private val file: File) : RunStore {
             }
         }.onFailure {
             Log.e("MikaRunStore", "run store could not be read; preserving damaged file", it)
-            file.copyTo(File(file.parentFile, file.name + ".corrupt"), overwrite = true)
+            file.keepCorruptCopy()
             records.clear()
         }
     }
 
     @Synchronized override fun save(record: StoredRun) {
-        records[record.id] = record
+        // 先写盘再改内存(和送达账本一样):写失败时内存仍和盘上一致
+        val next = LinkedHashMap(records).apply { put(record.id, record) }
         file.parentFile?.mkdirs()
-        val json = JsonArray(records.values.map { r -> buildJsonObject {
+        val json = JsonArray(next.values.map { r -> buildJsonObject {
             put("id", r.id.value); put("threadId", r.threadId); put("goal", r.goal)
             put("phase", code(r.phase)); put("reply", r.reply)
             put("deliveryId", r.deliveryId)
@@ -69,6 +70,7 @@ class FileRunStateStore(private val file: File) : RunStore {
         val temp = File(file.parentFile, file.name + ".tmp")
         FileOutputStream(temp).use { out -> out.write(json.toByteArray(Charsets.UTF_8)); out.fd.sync() }
         check(temp.renameTo(file)) { "run store rename failed" }
+        records[record.id] = record
     }
 
     @Synchronized override fun get(id: RunId): StoredRun? = records[id]

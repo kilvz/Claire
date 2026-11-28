@@ -8,7 +8,7 @@
     <string name="voice_steer_to">Telling “%1$s”</string>
     <string name="voice_engine_phone">Phone</string>
     <string name="voice_engine_phone_offline">Phone · offline</string>
-    <string name="voice_engine_sherpa">Sherpa-ONNX · on-device</string>
+    <string name="voice_engine_on_device">On-device · offline</string>
     <string name="voice_say_now">Go ahead, I’m listening…</string>
     <string name="voice_recording">Recording. Let go and it turns into text…</string>
     <string name="voice_foot_live">Let go · the words go into the box to edit</string>
@@ -36,13 +36,13 @@
     <string name="voice_speech_service_store_failed">Couldn’t open the Play Store page for “Speech Recognition &amp; Synthesis” by Google. Search the Play Store for that name (it used to be called “Speech Services by Google”) and install it.</string>
     <string name="voice_unavailable_system_silent">The phone’s built-in speech recognition didn’t respond, so no words came through. Pick a provider’s speech model in Settings › Models › Speech to text and it will work.</string>
     <string name="voice_unavailable_system_failed">The phone’s built-in speech recognition couldn’t start. Try again, or choose another recognition method in Settings › Models › Speech to text.</string>
-    <string name="voice_unavailable_sherpa_missing">Speech to text is set to an on-device Sherpa-ONNX model that isn’t downloaded yet. Download it in Settings › Models › Speech models, or pick another recognition method.</string>
-    <string name="voice_unavailable_sherpa_failed">The on-device Sherpa-ONNX engine couldn’t start. Try again, or choose another recognition method in Settings › Models › Speech to text.</string>
     <string name="voice_service_permission_title">The phone’s speech recognition can’t record yet</string>
     <string name="voice_service_permission_body">“%1$s” is the app that does speech recognition on this phone, and it hasn’t been allowed to record audio, so it can’t hear you. Claire’s own microphone permission is fine. Open its permission page and turn on the microphone, then come back and hold to talk again. You can also choose another recognition method in Settings › Models › Speech to text.</string>
     <string name="voice_service_settings_failed">Couldn’t open the settings page for “%1$s”. Find it in the system’s app list and turn on the microphone.</string>
     <string name="voice_unavailable_provider_gone">The provider of the chosen speech model has been removed. Pick another one in Settings › Models › Speech to text.</string>
     <string name="voice_unavailable_off">Speech to text is turned off. Pick one in Settings › Models › Speech to text.</string>
+    <string name="voice_unavailable_pack_missing">Voice pack needs downloading. The offline voice pack you picked isn’t on this phone; download it in Settings › Models › Speech to text and it works right away, no need to pick it again.</string>
+    <string name="voice_unavailable_on_device_unsupported">This device doesn’t support offline recognition. Pick another recognition method in Settings › Models › Speech to text.</string>
     <string name="voice_go_pick">Pick one</string>
     <string name="voice_permission_title">Claire needs the microphone</string>
     <string name="voice_permission_body">To hear you while you hold to talk, Claire needs to record audio. It was denied before, so the phone won’t ask again. Turn on the microphone on Claire’s permission page in system settings.</string>

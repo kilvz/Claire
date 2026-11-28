@@ -1,6 +1,6 @@
 package com.wangzan101.mika.about
 
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import com.wangzan101.mika.download.DownloadUrls
 import java.io.File
 import java.security.MessageDigest
 
@@ -22,32 +22,15 @@ class ApkRejected(val reason: Reason) : Exception(reason.name) {
  * the release metadata provides them), package name, version number and signing certificate.
  */
 internal object ApkIntegrity {
-    private val official = "${MikaLinks.RELEASES}/download/".toHttpUrl()
-
-    fun requireOfficialUrl(url: String) {
-        val parsed = url.toHttpUrl()
-        require(parsed.isHttps && parsed.host == official.host && parsed.port == 443)
-        require(parsed.username.isEmpty() && parsed.password.isEmpty())
-        require(parsed.encodedPath.startsWith(official.encodedPath))
-        require(parsed.encodedPath.endsWith(".apk", ignoreCase = true))
-    }
+    fun requireOfficialUrl(url: String) = DownloadUrls.requireRelease(url, ".apk")
 
     /**
      * The download URL may only be an official release asset, or "built-in/user-added mirror prefix + official asset URL".
      * Mirrors are still trusted by the user; size, digest and signature are verified after download as usual, so relaxing the
      * URL does not let another package in.
      */
-    fun requireTrustedDownloadUrl(url: String, officialUrl: String, mirrors: List<UpdateMirror>) {
-        if (url == officialUrl) {
-            requireOfficialUrl(url)
-            return
-        }
-        require(mirrors.any { url == it.prefix + officialUrl }) { "not an official or configured mirror URL" }
-        val parsed = url.toHttpUrl()
-        require(parsed.isHttps)
-        require(parsed.username.isEmpty() && parsed.password.isEmpty())
-        require(parsed.encodedPath.endsWith(".apk", ignoreCase = true))
-    }
+    fun requireTrustedDownloadUrl(url: String, officialUrl: String, mirrors: List<UpdateMirror>) =
+        DownloadUrls.requireTrusted(url, officialUrl, mirrors, ".apk")
 
     /** When a digest is given it must be sha256 and must match; any other form also counts as a mismatch, no exceptions. */
     fun verify(file: File, size: Long?, digest: String?) {

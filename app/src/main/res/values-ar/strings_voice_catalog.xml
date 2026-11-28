@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="models_voice_catalog">نماذج الصوت</string>
-    <string name="models_voice_catalog_sub">إدارة نماذج تحويل الكلام إلى نص، وتحويل النص إلى كلام، والمكالمات المباشرة في مكان واحد</string>
     <string name="voice_catalog_title">نماذج الصوت</string>
     <string name="voice_catalog_sub">إدارة نماذج تحويل الكلام إلى نص، وتحويل النص إلى كلام، والمكالمات المباشرة في مكان واحد. تُعلَن القدرات والبروتوكولات هنا؛ وصفحات الإدخال الصوتي والقراءة والمكالمات تختار التفضيلات وتستخدمها فقط.</string>
     <string name="voice_catalog_add">إضافة نموذج</string>
@@ -45,6 +44,7 @@
     <string name="voice_catalog_listening">أستمع، قُل شيئًا…</string>
     <string name="voice_catalog_incomplete">املأ تفاصيل الحساب المطلوبة أولاً</string>
     <string name="voice_catalog_protocol_stt_android_system">نظام Android</string>
+    <string name="voice_catalog_protocol_stt_ondevice">على الجهاز</string>
     <string name="voice_catalog_protocol_stt_audio_transcriptions">تفريغ الصوت</string>
     <string name="voice_catalog_protocol_stt_chat_input_audio">صوت إدخال الدردشة</string>
     <string name="voice_catalog_protocol_stt_gemini_inline">Gemini مضمّن</string>
@@ -59,14 +59,4 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">Volc ثنائي</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI في الوقت الفعلي</string>
     <string name="voice_catalog_tts_sample">مرحبًا، هذا اختبار صوتي.</string>
-    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX (على الجهاز)</string>
-    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX الإنجليزية (على الجهاز)</string>
-    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX متعدد اللغات (تنزيل)</string>
-    <string name="voice_catalog_sherpa_download">تنزيل (%1$s)</string>
-    <string name="voice_catalog_sherpa_downloading">جارٍ التنزيل… %1$d%%</string>
-    <string name="voice_catalog_sherpa_unpacking">جارٍ فك ضغط النموذج…</string>
-    <string name="voice_catalog_sherpa_downloaded">تم تنزيل النموذج</string>
-    <string name="voice_catalog_sherpa_download_failed">فشل التنزيل: %1$s</string>
-    <string name="voice_catalog_sherpa_retry">إعادة التنزيل</string>
-    <string name="voice_catalog_sherpa_needs_download">يجب تنزيل النموذج أولًا.</string>
 </resources>

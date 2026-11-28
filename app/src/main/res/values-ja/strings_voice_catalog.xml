@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="models_voice_catalog">音声モデル</string>
-    <string name="models_voice_catalog_sub">音声認識・音声合成・リアルタイム通話のモデルを一か所で管理</string>
     <string name="voice_catalog_title">音声モデル</string>
     <string name="voice_catalog_sub">音声認識・音声合成・リアルタイム通話のモデルを一か所で管理します。能力とプロトコルはここで宣言し、音声入力・読み上げ・通話の設定ページでは選択と利用の好みだけを扱います。</string>
     <string name="voice_catalog_add">モデルを追加</string>
@@ -45,6 +44,7 @@
     <string name="voice_catalog_listening">聞き取り中です。話しかけてください…</string>
     <string name="voice_catalog_incomplete">先にアカウント情報を入力してください</string>
     <string name="voice_catalog_protocol_stt_android_system">Android システム</string>
+    <string name="voice_catalog_protocol_stt_ondevice">端末内</string>
     <string name="voice_catalog_protocol_stt_audio_transcriptions">音声文字起こし</string>
     <string name="voice_catalog_protocol_stt_chat_input_audio">チャット音声入力</string>
     <string name="voice_catalog_protocol_stt_gemini_inline">Gemini インライン</string>
@@ -59,14 +59,4 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">Volc 双方向</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI リアルタイム</string>
     <string name="voice_catalog_tts_sample">こんにちは、これは音声テストです。</string>
-    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX（端末内）</string>
-    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX 英語（端末内）</string>
-    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX 多言語（ダウンロード）</string>
-    <string name="voice_catalog_sherpa_download">ダウンロード（%1$s）</string>
-    <string name="voice_catalog_sherpa_downloading">ダウンロード中… %1$d%%</string>
-    <string name="voice_catalog_sherpa_unpacking">モデルを展開しています…</string>
-    <string name="voice_catalog_sherpa_downloaded">モデルをダウンロードしました</string>
-    <string name="voice_catalog_sherpa_download_failed">ダウンロードに失敗しました：%1$s</string>
-    <string name="voice_catalog_sherpa_retry">再ダウンロード</string>
-    <string name="voice_catalog_sherpa_needs_download">先にモデルをダウンロードしてください。</string>
 </resources>

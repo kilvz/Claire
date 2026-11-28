@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="models_voice_catalog">Mô hình giọng nói</string>
-    <string name="models_voice_catalog_sub">Quản lý mô hình chuyển lời nói thành văn bản, chuyển văn bản thành lời nói và cuộc gọi trực tiếp ở một nơi</string>
     <string name="voice_catalog_title">Mô hình giọng nói</string>
     <string name="voice_catalog_sub">Quản lý mô hình chuyển lời nói thành văn bản, chuyển văn bản thành lời nói và cuộc gọi trực tiếp ở một nơi. Khả năng và giao thức được khai báo tại đây; nhập liệu bằng giọng nói, đọc thành tiếng và cài đặt cuộc gọi chỉ chọn và dùng các tùy chọn.</string>
     <string name="voice_catalog_add">Thêm mô hình</string>
@@ -45,13 +44,13 @@
     <string name="voice_catalog_listening">Đang nghe, hãy nói gì đó…</string>
     <string name="voice_catalog_incomplete">Điền thông tin tài khoản bắt buộc.</string>
     <string name="voice_catalog_protocol_stt_android_system">Hệ thống Android</string>
+    <string name="voice_catalog_protocol_stt_ondevice">Trên thiết bị</string>
     <string name="voice_catalog_protocol_stt_audio_transcriptions">Phiên âm âm thanh</string>
     <string name="voice_catalog_protocol_stt_chat_input_audio">Âm thanh đầu vào trò chuyện</string>
     <string name="voice_catalog_protocol_stt_gemini_inline">Gemini inline</string>
     <string name="voice_catalog_protocol_stt_doubao_streaming">Doubao streaming</string>
     <string name="voice_catalog_protocol_stt_funasr_streaming">FunASR streaming</string>
     <string name="voice_catalog_protocol_stt_bailian_streaming">Bailian streaming</string>
-    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX (trên thiết bị)</string>
     <string name="voice_catalog_protocol_tts_android_system">Hệ thống Android</string>
     <string name="voice_catalog_system_stt_name">Nhận dạng giọng nói hệ thống Android</string>
     <string name="voice_catalog_system_tts_name">Tổng hợp giọng nói hệ thống Android</string>
@@ -61,13 +60,4 @@
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI Realtime</string>
     <string name="voice_catalog_tts_sample">Xin chào, đây là bản kiểm tra giọng nói.</string>
 
-    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX tiếng Anh (trên thiết bị)</string>
-    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX đa ngôn ngữ (tải xuống)</string>
-    <string name="voice_catalog_sherpa_download">Tải xuống (%1$s)</string>
-    <string name="voice_catalog_sherpa_downloading">Đang tải… %1$d%%</string>
-    <string name="voice_catalog_sherpa_unpacking">Đang giải nén mô hình…</string>
-    <string name="voice_catalog_sherpa_downloaded">Đã tải mô hình</string>
-    <string name="voice_catalog_sherpa_download_failed">Tải xuống thất bại: %1$s</string>
-    <string name="voice_catalog_sherpa_retry">Tải lại</string>
-    <string name="voice_catalog_sherpa_needs_download">Cần tải mô hình xuống trước.</string>
 </resources>
