@@ -3,8 +3,8 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.10.3 (versionCode 83)
-- **Base version:** upstream Mika, merged through commit `644d3d2f2`
+- **Claire version:** 2.11.0 (versionCode 84)
+- **Base version:** upstream Mika, merged through commit `6fdd16bd5`
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
   to it).
@@ -195,6 +195,27 @@ recorded base version.
   (optionally `token|chatId`) and the bot is saved automatically, no
   manual token entry. A token alone fills the token field; the chat ID
   is still asked for. CameraX + ML Kit barcode scanning.
+
+- 2.11.0: ported upstream Mika through commit `6fdd16bd5` (28 Nov
+  2026). AI phone calls, their summaries and the pre-call briefing now
+  follow the app language, and hang-up detection understands every
+  supported language instead of Chinese only. The voice page can stop a
+  running recognition, read-aloud or preview test, non-realtime
+  recognition tests show a live waveform and finish after a pause, and
+  each model's capabilities have their own row with test, preview and
+  stop controls. Recognition language opens a bottom sheet, read-aloud
+  speed and length use number dialogs, and built-in recognition reports
+  a runtime failure as "couldn't start" and retries online once. Sharing
+  images and videos from a task works again, lock-screen PIN detection
+  handles editable PIN fields, Honor and MagicOS keyguards unlock through
+  fallback window lists, and the self-check reports a virtual display
+  without its own focus as partial support. In WeChat, the owner's stop
+  command now stops running, queued and not-yet-started tasks in that
+  chat. Chat history loads off the main thread, call transcripts keep the
+  order things were said, Markdown export escapes list and heading
+  markers, and the front desk no longer announces a task as started
+  twice. Shared plumbing behind file sharing, atomic writes, app
+  launching and voice streaming was consolidated with no behavior change.
 
 - 2.10.3: the task tray says what a running task is doing even when
   Claire wrote no progress note (it falls back to the tool's reason and
