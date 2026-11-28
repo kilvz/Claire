@@ -8,7 +8,7 @@ Kept separate from "learning from completed tasks". `RunLearning` / `LearnGate` 
 
 The name is "Teach Claire".
 
-- In the panel opened by 「＋」 in the chat input bar.
+- In the panel opened by "+" in the chat input bar.
 - On the idle card after the floating capsule is expanded. The entry is tucked into the arrow above the input bar and collapsed by default; only tapping the arrow makes "Teach Claire" appear, and tapping again collapses it. The "Learning" overlay during learning is not here, and pausing or ending does not collapse it.
 
 The entry for when a task is stuck is not in this version. A demonstration cannot be started while a task is running; while a demonstration is in progress (capturing or paused), no new task is started, and the next queued item stays in the queue and is not taken out to run.

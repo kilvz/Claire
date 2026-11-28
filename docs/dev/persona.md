@@ -43,7 +43,7 @@ A persona can carry a name (`Persona.nickname`): the assistant's self-designatio
 - When the name is Claire, the identity sentence and the persona layer are byte-for-byte the same as before.
 - When it is not Claire: the first sentence of `system/identity.md` uses the name (the file has a placeholder); it is immediately followed by a `persona/renamed.md` passage explaining that Claire is the name of the app it lives in, that "Claire" later in the text and in tool descriptions refers to this app and to itself, and that renaming does not change what it can do; the "You are still …" in the persona layer's fixed header also uses the name.
 - When only the name is changed and everything else is default, there is no persona layer, but the run record still notes which one was used this round.
-- 「Claire」 in the UI (the top bar, the top-left of the answer card, copy in Settings) does not follow the name: that is the app's name.
+- "Claire" in the UI (the top bar, the top-left of the answer card, copy in Settings) does not follow the name: that is the app's name.
 - Claire in tool descriptions, feedback text and internal-role prompts is unchanged; whether messages addressing it by the new name go equally smoothly through internal steps such as intent detection has not been tested. Personal assistant mode has its own prompt and carries no name.
 
 ## Fixed header/footer and escaping
