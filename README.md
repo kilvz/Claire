@@ -65,6 +65,7 @@ Claire works on a hidden background screen, so you can keep using your phone whi
 
 ## New in 2.10
 
+- **Pictures in Telegram.** A task that exports an image now delivers it to the Telegram chat as a photo instead of leaving it only in `Download/Claire`; an image Telegram rejects on its own size or dimension limits arrives as a file with the original bytes.
 - **Live on-device dictation.** The bundled Zipformer English 20M pack writes words while you speak, with no network, no quota and no length cap; select it under Settings › Models › Voice input. The downloadable Zipformer Multilingual pack does the same for Arabic, English, Indonesian, Japanese, Russian, Thai, Vietnamese and Chinese from Settings › Models › Voice input › Offline voice packs. Live packs are always chosen explicitly: "Auto" and fallback chains keep using whole-utterance packs such as Whisper Base, which remains the recommendation for English and Indonesian.
 - **Offline voice packs.** Voice input can run entirely on the phone with a downloaded voice pack: Whisper Base, covering English and Indonesian. Download it in Settings › Models › Voice input › Offline voice packs, import it from a file when the phone is offline, or fetch it through a mirror; every file is checked against its checksum. "Auto" falls back to an installed pack when the system recognizer cannot be used, and the pack stays selected across downloads, updates and restores.
 - **Settings search reaches inside pages.** Searching settings now finds individual rows and switches, then scrolls to the row and highlights it.

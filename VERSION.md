@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.10.0 (versionCode 80)
+- **Claire version:** 2.10.1 (versionCode 81)
 - **Base version:** upstream Mika, merged through commit `644d3d2f2`
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -195,6 +195,13 @@ recorded base version.
   (optionally `token|chatId`) and the bot is saved automatically, no
   manual token entry. A token alone fills the token field; the chat ID
   is still asked for. CameraX + ML Kit barcode scanning.
+
+- 2.10.1: pictures now arrive in Telegram. An image a task exports
+  (share_file's PNG, JPEG, GIF or WebP) is sent into the chat as a
+  photo, instead of being left only in `Download/Claire`. When
+  Telegram's own photo size or dimension limits reject one, the
+  original bytes go as a file rather than failing; an upload that
+  cannot be confirmed is reported and never re-sent automatically.
 
 - 2.10.0: live on-device dictation. Selecting the bundled Zipformer
   English 20M pack writes words as you speak, with no network, no quota

@@ -70,7 +70,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.10.0: live on-device dictation. The bundled Zipformer English 20M pack now writes words while you speak — no network, no quota and no length cap — and the downloadable Zipformer Multilingual pack does the same for Arabic, English, Indonesian, Japanese, Russian, Thai, Vietnamese and Chinese. Live packs are always chosen explicitly: Auto and fallback chains keep using whole-utterance packs, and Whisper Base remains the recommendation for English and Indonesian. The streaming model loads on press and is shared between sessions, so dictation starts quickly and does not reload between attempts.
+            New in 2.10.1: pictures now arrive in Telegram. When a task exports an image — a photo taken with the camera, a screenshot, or a generated picture — the chat receives it as a photo instead of it staying only in Download/Claire. Photos that Telegram rejects on its own size or dimension limits arrive as a file with the original bytes, and an upload that cannot be confirmed is reported instead of being silently re-sent.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt
