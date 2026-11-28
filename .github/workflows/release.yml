@@ -70,7 +70,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.10.2: Claire starts the work she says she is starting. A reply that promises to change a setting, look something up or operate the phone now begins that task in the same turn; if a promise still goes out with nothing behind it, Claire gets one more chance to start the work, so "on it" is backed by a running task instead of leaving you waiting.
+            New in 2.10.3: the task tray now shows what a running task is doing even when Claire wrote no progress note, falling back to the tool's reason and then to the task's reported progress. Built-in prompts, tool names and documentation are also now entirely in English, with Chinese kept only where the app has to read or show it.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt

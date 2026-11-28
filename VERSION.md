@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.10.2 (versionCode 82)
+- **Claire version:** 2.10.3 (versionCode 83)
 - **Base version:** upstream Mika, merged through commit `644d3d2f2`
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -195,6 +195,12 @@ recorded base version.
   (optionally `token|chatId`) and the bot is saved automatically, no
   manual token entry. A token alone fills the token field; the chat ID
   is still asked for. CameraX + ML Kit barcode scanning.
+
+- 2.10.3: the task tray says what a running task is doing even when
+  Claire wrote no progress note (it falls back to the tool's reason and
+  then to the task's reported progress). Built-in prompts, tool names,
+  code comments and documentation are now entirely in English; Chinese
+  remains only where the app must recognize or display it.
 
 - 2.10.2: a promise is backed by work. The front desk must call a tool in
   the same turn as a first-person commitment ("On it, I'll …", "Let me
