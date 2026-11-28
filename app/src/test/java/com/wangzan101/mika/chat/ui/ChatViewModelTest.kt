@@ -1263,7 +1263,7 @@ class ChatViewModelTest {
         assertTrue(vm.send("说明这张图", ok))
         runCurrent()
         assertEquals(listOf(listOf("content://mika.shared/shared.jpg")), imported)
-        assertEquals(listOf("start:说明这张图\n附件:/workspace/inbox/photo.jpg(3 B)"), calls)
+        assertEquals(listOf("start:说明这张图\nAttachment:/workspace/inbox/photo.jpg(3 B)"), calls)
         assertNull(drafts.read())
         assertFalse(drafts.attachmentFile("shared.jpg")!!.exists())
     }
@@ -1302,7 +1302,7 @@ class ChatViewModelTest {
 
         assertTrue(restored.send("", ok))
         runCurrent()
-        assertEquals(listOf("start:附件:/workspace/inbox/周报.pdf(3 B)"), calls)
+        assertEquals(listOf("start:Attachment:/workspace/inbox/周报.pdf(3 B)"), calls)
         assertNull(drafts.read())
         assertFalse(file.exists())
     }
@@ -1592,7 +1592,7 @@ class ChatViewModelTest {
         assertTrue(vm.send("一起看", ok))
         runCurrent()
         assertEquals(listOf(listOf("content://mika.shared/a.jpg", "content://mika.shared/c.png")), imported)
-        assertEquals(listOf("start:一起看\n附件:/workspace/inbox/a.jpg(2 B)\n附件:/workspace/inbox/c.png(1 B)"), calls)
+        assertEquals(listOf("start:一起看\nAttachment:/workspace/inbox/a.jpg(2 B)\nAttachment:/workspace/inbox/c.png(1 B)"), calls)
         assertNull(drafts.read())
         assertFalse(drafts.attachmentFile("a.jpg")!!.exists())
         assertFalse(drafts.attachmentFile("c.png")!!.exists())
@@ -1946,7 +1946,7 @@ class ChatViewModelTest {
         assertTrue(vm.send(vm.ui.value.input, ok))
         runCurrent()
         assertEquals(id to listOf("content://x/1"), imported.last())
-        assertEquals(listOf("start:汇总一下\n附件:/workspace/inbox/报表 (1).csv(2 KB)"), calls)
+        assertEquals(listOf("start:汇总一下\nAttachment:/workspace/inbox/报表 (1).csv(2 KB)"), calls)
         assertTrue(vm.ui.value.attachments.isEmpty())
         assertTrue(vm.ui.value.input.isEmpty())
         // 这条会话自己在跑任务时不收附件(附件只随新任务直接开)
@@ -1965,7 +1965,7 @@ class ChatViewModelTest {
         assertTrue(vm.toggleAttachment(PendingAttachment("content://m/1", "a.jpg", 1L)))
         assertTrue(vm.send("", ok))
         runCurrent()
-        assertEquals(listOf("start:附件:/workspace/inbox/a.jpg(3.0 MB)"), calls)
+        assertEquals(listOf("start:Attachment:/workspace/inbox/a.jpg(3.0 MB)"), calls)
     }
 
     @Test fun failedImportWithTextKeepsDraftAndCanBeRetried() = runTest {
@@ -1989,7 +1989,7 @@ class ChatViewModelTest {
         fails = false
         assertTrue(vm.send(vm.ui.value.input, ok))
         runCurrent()
-        assertEquals(listOf("start:分析这个文件\n附件:/workspace/inbox/a.pdf(1 B)"), calls)
+        assertEquals(listOf("start:分析这个文件\nAttachment:/workspace/inbox/a.pdf(1 B)"), calls)
         assertTrue(vm.ui.value.attachments.isEmpty())
     }
 
@@ -2299,10 +2299,10 @@ class ChatViewModelTest {
         notesFlow.value = mapOf("r1" to com.wangzan101.mika.memory.RunNotes("c1", "r1", listOf(remembered)))
         runCurrent()
         val note = vm.ui.value.exchanges.single().memoryNotes.single()
-        assertEquals("记住了:用户点外卖不要香菜", vm.noteText(note))
+        assertEquals("Remembered: 用户点外卖不要香菜", vm.noteText(note))
         // 内容现取:那条删掉后写「一条已删除的记忆」
         items.value = items.value.filter { it.id != "a" }
-        assertEquals("记住了:一条已删除的记忆", vm.noteText(note))
+        assertEquals("Remembered: 一条已删除的记忆", vm.noteText(note))
         // 重新打开对话时从存下的那一轮读回(只存了种类和编号)
         val store = ConversationStore(tmp.newFolder())
         store.append("c2", Turn("点外卖", "ok", "succeeded", runId = "r2", memoryNotes = listOf(remembered), usedMemory = listOf("a")))
@@ -2329,7 +2329,7 @@ class ChatViewModelTest {
         val second = procedure.copy(undoToken = "expired", pendingId = "p2", memoryId = "p2")
         notesFlow.value = mapOf("r1" to com.wangzan101.mika.memory.RunNotes("c1", "r1", listOf(procedure, second)))
         runCurrent()
-        assertEquals("要我以后都这样做吗?点外卖先比价", vm.noteText(procedure))
+        assertEquals("Should I always do it this way from now on? 点外卖先比价", vm.noteText(procedure))
         vm.approveNote("r1", procedure); runCurrent()
         assertEquals(listOf("approve:p1"), learnCalls)
         // 「不要」时令牌已失效:直接删掉那条做法
@@ -2351,7 +2351,7 @@ class ChatViewModelTest {
 
     @Test fun suspendedSkillRestoreAndView() = runTest {
         val vm = vmWithHistory()
-        val learned = com.wangzan101.mika.core.learn.skills.SkillNote("Mika 学会了一项技能:发微信", draftId = "d1")
+        val learned = com.wangzan101.mika.core.learn.skills.SkillNote("Claire 学会了一项技能:发微信", draftId = "d1")
         val suspended = com.wangzan101.mika.core.learn.skills.SkillNote("这项技能最近不灵,先停用了", suspended = "wechat-msg")
         notesFlow.value = mapOf("r1" to com.wangzan101.mika.memory.RunNotes("c1", "r1", skillNotes = listOf(learned, suspended)))
         runCurrent()
@@ -3453,7 +3453,7 @@ class ChatViewModelTest {
         assertTrue(vm.send("修改后的问题", ok))
         runCurrent()
         assertEquals(0, imports)
-        assertEquals("start:修改后的问题\n附件:${paths[0]}(2 B)\n附件:${paths[2]}(2 B)", calls.last { it.startsWith("start:") })
+        assertEquals("start:修改后的问题\nAttachment:${paths[0]}(2 B)\nAttachment:${paths[2]}(2 B)", calls.last { it.startsWith("start:") })
         assertFalse(result.needsReattach)
     }
 
