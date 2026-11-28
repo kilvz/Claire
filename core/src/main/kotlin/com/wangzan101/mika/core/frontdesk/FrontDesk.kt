@@ -1,5 +1,6 @@
 package com.wangzan101.mika.core.frontdesk
 
+import com.wangzan101.mika.core.agent.RunProgress
 import com.wangzan101.mika.core.agent.TaskState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -215,7 +216,10 @@ class FrontDesk(
     }
 
     private fun lineOf(state: TaskState): String? = when (state) {
+        // Prefer what the model wrote alongside the call, then the call's reason (as the chat row and task chip already do), then task progress
         is TaskState.Running -> deskLine(state.narration)
+            ?: deskLine(state.reason)
+            ?: deskLine((state.progress as? RunProgress.Task)?.display)
         is TaskState.Held -> if (state.reason.queued) null else deskLine(state.reason.why)
         is TaskState.WaitingInput -> deskLine(state.prompt)
         is TaskState.WaitingTakeover -> deskLine(state.message)

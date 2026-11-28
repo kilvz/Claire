@@ -2,6 +2,7 @@ package com.wangzan101.mika.core.frontdesk
 
 import com.wangzan101.mika.core.agent.FailKind
 import com.wangzan101.mika.core.agent.GateReason
+import com.wangzan101.mika.core.agent.RunProgress
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.safety.gate.ConfirmationRequest
 import com.wangzan101.mika.core.safety.gate.IrrevAction
@@ -208,6 +209,31 @@ class FrontDeskTest {
         state.value = TaskState.WaitingInput("要订哪一间?", null)
         runCurrent()
         assertEquals(listOf("找日程", "填标题", "要订哪一间?"), desk.active.value.single().recent)
+    }
+
+    @Test
+    fun runningWithoutNarrationShowsTheToolReason() = runTest {
+        now = 1_000L
+        val state = port.add("t1", TaskState.Running(step = 1, note = "", reason = "Opening the auto-off timer setting"))
+        val desk = desk()
+        desk.track("t1", "Turn off hotspot auto-off")
+        runCurrent()
+        assertEquals("Opening the auto-off timer setting", desk.active.value.single().line)
+        assertEquals(listOf(DeskStep("Opening the auto-off timer setting", 1_000L)), desk.active.value.single().steps)
+
+        now = 5_000L
+        state.value = TaskState.Running(step = 2, note = "", narration = "", reason = "Reading the hotspot timeout")
+        runCurrent()
+        assertEquals(
+            listOf("Opening the auto-off timer setting", "Reading the hotspot timeout"),
+            desk.active.value.single().recent,
+        )
+
+        // No narration and no reason: fall back to the task progress the model reported
+        now = 9_000L
+        state.value = TaskState.Running(step = 3, note = "", progress = RunProgress.Task("Checking the hotspot", 2, 4, null))
+        runCurrent()
+        assertEquals("Checking the hotspot · 2/4", desk.active.value.single().line)
     }
 
     @Test
