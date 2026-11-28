@@ -139,9 +139,9 @@ fun ChatScreen(
     voice: VoiceSource? = null,
     /** The "choose" in "voice input is not available yet". */
     openSpeechModel: () -> Unit = {},
-    /** 「还不能语音输入」里的「下载离线语音包」。 */
+    /** "Download an offline voice pack" in the "voice input not available yet" notice. */
     openVoicePacks: () -> Unit = {},
-    /** 输入框里还没发出的字，交给「教 Mika」预填，不会自己开始。 */
+    /** Unsent text in the input box is handed to "Teach Claire" as a prefill and does not start on its own. */
     onOpenTeach: (String) -> Unit = {},
     /** Recommended tasks for the home screen. When not passed, the locally saved set is used; tests pass a separate store so the user's data is not modified. */
     recommendations: RecommendedTaskStore? = null,

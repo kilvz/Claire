@@ -44,8 +44,8 @@ class VoiceAdapterRegistry(
 
     companion object {
         /**
-         * 不依赖设备的识别协议。本机语音包([com.wangzan101.mika.voice.model.adapters.OnDeviceSttAdapter])
-         * 要用 App 的文件目录和共用的模型,由 [VoiceModelEnvironment.get] 另外加上。
+         * Recognition protocols that do not depend on the device. On-device packs ([com.wangzan101.mika.voice.model.adapters.OnDeviceSttAdapter])
+         * need the app's files directory and the shared model, which [VoiceModelEnvironment.get] adds separately.
          */
         fun defaultSttAdapters(): List<SttAdapter> = listOf(
             AndroidSystemSttAdapter(),

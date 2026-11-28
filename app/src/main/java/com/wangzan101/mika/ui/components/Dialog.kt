@@ -68,7 +68,7 @@ fun MikaDialog(
             if (actions != null) {
                 actions()
             } else {
-                // 操作区不用强调色:两个按钮同一浅灰底,确认用正文色加粗,取消用次要色;调用方自己给的颜色(如删除的红)照旧
+                // The action row avoids the accent color: both buttons share a light gray background, confirm is bold in the body color, cancel uses the secondary color; caller-provided colors (such as red for delete) still apply
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (dismissButton != null) {
                         DialogAction(Modifier.weight(1f), c.fill, c.ink2, androidx.compose.ui.text.font.FontWeight.Normal) { dismissButton() }

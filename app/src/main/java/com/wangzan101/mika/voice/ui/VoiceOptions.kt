@@ -22,7 +22,7 @@ enum class VoiceTrait { Live, AfterSpeech, Free, StreamingRead, WholeRead, Inter
 /** Where a choice comes from, shown under its name. */
 sealed interface VoiceSource {
     data object Device : VoiceSource
-    /** 本机离线语音包:列表里标「本机 · 离线」。 */
+    /** On-device offline voice pack: shown as "On-device · Offline" in lists. */
     data object OnDevice : VoiceSource
     data class ChatAccount(val name: String) : VoiceSource
     data class Service(val name: String) : VoiceSource
@@ -82,7 +82,7 @@ internal fun VoiceModel.traits(capability: VoiceCapability): List<VoiceTrait> = 
         SttProtocol.ElevenLabsUpload, SttProtocol.DeepgramUpload, SttProtocol.AzureShortAudio,
         SttProtocol.TencentSentence, SttProtocol.XfyunDictation,
         -> listOf(VoiceTrait.AfterSpeech)
-        // 本机语音包:松手后整段转写,不花钱(列表里标「本机 · 离线」,见 [VoiceSource.OnDevice])
+        // On-device pack: transcribes the whole recording after release at no cost (shown as "On-device · Offline", see [VoiceSource.OnDevice])
         SttProtocol.OnDevice -> listOf(VoiceTrait.AfterSpeech, VoiceTrait.Free)
         null -> emptyList()
     }

@@ -33,11 +33,11 @@ class VoiceModelEnvironment(
     /** Writable voice-owned credential store; null in tests that never persist owned accounts. */
     val credentialStore: VoiceCredentialStore? = null,
     private val migrationMarker: MigrationMarker = MigrationMarker.None,
-    /** 本机语音包的存放(`filesDir/voice-models`),App 里共用这一份;测试里不用时为 null。 */
+    /** Store for on-device voice packs (`filesDir/voice-models`), shared across the app; null in tests that do not need it. */
     val voicePacks: VoicePackStore? = null,
-    /** 随 APK 的语音包清单,第一次用到时读;测试里不用时为 null。 */
+    /** Voice-pack manifest bundled with the APK, read on first use; null in tests that do not need it. */
     val voicePackCatalog: (() -> VoicePackCatalog)? = null,
-    /** 本机识别引擎(看设备跑不跑得了某个语音包);测试里不用时为 null。 */
+    /** On-device recognition engines (checks whether the device can run a pack); null in tests that do not need it. */
     val voicePackBackends: OnDeviceBackends? = null,
 ) {
     /** Set when the one-time legacy migration failed; the catalog page surfaces it while legacy behavior is retained. */
@@ -125,7 +125,7 @@ class VoiceModelEnvironment(
     val realtime: RealtimeSelectionController by lazy { RealtimeSelectionController(this) }
 
     companion object {
-        /** 语音包在 `filesDir` 下的目录;备份不包含它。 */
+        /** Voice-pack directory under `filesDir`; backups exclude it. */
         const val VOICE_PACK_DIR = "voice-models"
 
         @Volatile

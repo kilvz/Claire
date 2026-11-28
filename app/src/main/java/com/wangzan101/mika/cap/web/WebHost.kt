@@ -182,7 +182,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
                     val cur = frame
                     val target = if (cur != null && cur.width == stridePx && cur.height == image.height) cur
                     else Bitmap.createBitmap(stridePx, image.height, Bitmap.Config.ARGB_8888).also { cur?.recycle() }
-                    // 最后一行可能不带填充,缓冲比整块位图短:copyStridedFrame 先垫进一块等长的缓冲
+                    // The last row may carry no padding, leaving the buffer shorter than the whole bitmap: copyStridedFrame pads into a buffer of the needed length first
                     scratch = copyStridedFrame(target, plane.buffer, scratch)
                     frame = target
                 }

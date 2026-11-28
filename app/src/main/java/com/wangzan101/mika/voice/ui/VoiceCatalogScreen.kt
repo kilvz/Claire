@@ -144,7 +144,7 @@ internal fun VoiceCatalogContent(viewModel: VoiceCatalogViewModel, onBack: () ->
             modifier = Modifier.fillMaxWidth().testTag("voice-catalog-add"),
         )
 
-        // 本机语音包由「离线语音包」页管(下载、删除),不在这里当普通服务编辑
+        // On-device packs are managed on the "Offline voice packs" page (download, delete) and are not edited here as ordinary services
         val services = snapshot.services.filter { it.id != OnDeviceCatalog.SERVICE_ID }
         val groups = snapshot.models.groupBy { it.serviceId }
         if (services.isEmpty() && snapshot.models.none { it.serviceId != OnDeviceCatalog.SERVICE_ID }) {
@@ -528,7 +528,7 @@ private fun VoiceCatalogSheet(
             if (form.sttOn) {
                 ProtocolBlock(
                     stringResource(R.string.voice_catalog_stt_protocol),
-                    // 本机离线识别只由「离线语音包」页登记,不能手填成自建服务的协议
+                    // On-device offline recognition is registered only by the "Offline voice packs" page and cannot be entered by hand as a self-hosted service protocol
                     SttProtocol.entries.filter { it != SttProtocol.OnDevice }.map { it to sttProtocolLabel(it) },
                     form.sttProtocol.name,
                     { name -> form.sttProtocol = SttProtocol.valueOf(name) },

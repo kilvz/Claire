@@ -155,7 +155,7 @@ class FeatureFlags(private val prefs: SharedPreferences) {
         prefs.edit().putBoolean(SHOW_TASK_COST, on).apply()
     }
 
-    /** 干活时把被操作的 App 静音;默认开,用户可以关。 */
+    /** Mute the app being operated while working; on by default and the user can turn it off. */
     fun muteTarget(): Boolean = prefs.getBoolean(MUTE_TARGET, true)
 
     fun setMuteTarget(on: Boolean) {

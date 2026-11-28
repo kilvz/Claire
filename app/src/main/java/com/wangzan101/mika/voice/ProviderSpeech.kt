@@ -72,7 +72,7 @@ class ProviderSpeech(
                 } catch (e: ModelError) {
                     SpeechEvent.Failed(SpeechFailure.Provider(e))
                 } catch (e: VoiceModelError) {
-                    // 语音层自己的分类(本机语音包没装、本机识别失败……)原样交给界面,不包成「回复解析不了」
+                    // The voice layer's own categories (pack not installed, on-device recognition failed, ...) reach the UI unchanged instead of being wrapped as "cannot parse the reply"
                     SpeechEvent.Failed(SpeechFailure.Provider(e))
                 } catch (e: Exception) {
                     SpeechEvent.Failed(SpeechFailure.Provider(ModelError.BadResponse(e.message.orEmpty(), e)))

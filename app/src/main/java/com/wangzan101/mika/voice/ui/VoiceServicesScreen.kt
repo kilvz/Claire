@@ -139,7 +139,7 @@ fun VoiceServicesScreen(store: ProviderStore, onBack: () -> Unit, onOpenCustom: 
     NavSlide(currentPage, depth = { it.depth }, states = pageStates, pageKey = { it.key }) { page ->
         when (page) {
             is VoiceServicePage.Result -> PresetResult(snapshot, page.refs, viewModel, voiceModels, onDone = {
-                // 存完回到这家服务商的详情,看它带来的全部模型
+                // After saving, return to this provider's details to see every model it brings
                 detail = page.refs.firstOrNull()?.serviceId ?: detail
                 saved = null; preset = null; vendorForm = null
             })

@@ -91,7 +91,7 @@ fun LanguageScreen(language: AppLanguage, onLanguage: (AppLanguage) -> Unit, onB
                         appearanceLabel(m), selected = m == themeMode, first = idx == 0,
                         note = if (m == ThemeMode.System) stringResource(R.string.appearance_system_detail) else null,
                         onClick = {
-                            // 界面跟着设置当场换颜色,不重建,页面和滚动位置都不丢
+                            // The UI recolors immediately with the setting, without recomposition, so the page and scroll position are kept
                             if (m != themeMode) flags.setThemeMode(m)
                         },
                     )
@@ -102,7 +102,7 @@ fun LanguageScreen(language: AppLanguage, onLanguage: (AppLanguage) -> Unit, onB
         GroupCard {
             Column(Modifier.fillMaxWidth().focusHighlightTarget(SettingsFocusKey.ACCENT_COLOR)) {
                 val dark = MikaTheme.colors.isDark
-                // 背景图片的颜色在当强调色时,这里选的暂时不用,行变灰
+                // While the background image's color is the accent, the choice here is unused for now and the row is dimmed
                 val followingImage = skin.accentHue != null
                 ThemeAccent.entries.forEachIndexed { idx, a ->
                     RadioRow(
@@ -110,7 +110,7 @@ fun LanguageScreen(language: AppLanguage, onLanguage: (AppLanguage) -> Unit, onB
                         subtitle = if (a == ThemeAccent.Blue) stringResource(R.string.accent_default) else null,
                         onClick = { if (a != themeAccent) flags.setThemeAccent(a) },
                     ) {
-                        // 色块按此刻的深浅色画,和选上以后看到的一样
+                        // Draw the swatch in the current light or dark tone, matching what is seen after selection
                         Box(Modifier.size(18.dp).background(accentTone(a, dark).first, CircleShape))
                     }
                 }

@@ -698,7 +698,7 @@ class TaskRun(
     }
 
     suspend fun execute(priorTurns: List<Turn>): TaskState {
-        // 每次启动（UI、定时、渠道都一样）重读所属对话（前台派出的子对话跟着前台对话）；此后整次运行只用这一份不可变路由。
+        // Every start (UI, schedule, channel alike) re-reads the owning conversation (a child launched from the foreground follows it); the whole run then uses this one immutable route.
         val choice = withContext(Dispatchers.IO) {
             runCatching { ConversationStore.shared(service).runMainChoice(conversationId) }.getOrNull()
         }

@@ -156,7 +156,7 @@ object MikaIcons {
     /** Handset: start a voice call (distinct from "phone", so it reads as a call at a glance). */
     val Handset = stroke(
         "handset",
-        // 手柄朝左下鼓、听筒在左上，和通用的电话图标同向(原路径绕中心转 180°)。
+        // The handset bulges to the lower left with the earpiece at the upper left, matching the standard phone icon's orientation (the original path was rotated 180° about its center).
         "M17.61 18.83 A9.1 9.1 0 0 1 5.18 6.4 A2.5 2.5 0 0 1 7.68 10.73 A4.1 4.1 0 0 0 13.28 16.33 A2.5 2.5 0 0 1 17.61 18.83 Z",
     )
     val Moon = stroke("moon", "M20 14.5 A8 8 0 0 1 9.5 4 a8 8 0 1 0 10.5 10.5 z")

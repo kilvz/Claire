@@ -300,8 +300,8 @@ internal class DeskChatOps(
     }
 
     /**
-     * 把这条会话工作区里的文件复制进子会话 [child] 的工作区;有一个没复制成就整件不派(返回 null)。
-     * 这批文件导入时已按单个文件的上限收下,总量至少给到它们导入时大小的合计;合计不到默认总量时,剩下的额度照旧用来复制其余历史附件。
+     * Copies files from this conversation's workspace into the child conversation [child]'s workspace; if any copy fails the whole dispatch is skipped (returns null).
+     * These files were accepted under the per-file limit when imported, so give them at least their combined imported size; when that is below the default total, the remaining budget still copies the other historical attachments.
      */
     private suspend fun copyFiles(child: String, files: List<Pair<String, Long>>): List<Pair<String, Long>>? {
         val workspace = vm.branchWorkspace ?: return null

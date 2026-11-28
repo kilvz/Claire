@@ -87,7 +87,7 @@ internal fun CallVoiceScreen(runtime: CallRuntime, onBack: () -> Unit, onOpenSer
     val s = snapshot.selections
     val follows = s.callEngine == null && s.callStt == null && s.callTts == null && s.callRealtime == null
     val engine = s.resolvedCallEngine
-    // 通话只用云端听写:语音输入选的是手机自带识别或本机语音包时,通话没有可沿用的
+    // Calls use cloud transcription only: when voice input is set to the system recognizer or an on-device pack, calls have nothing to reuse
     val sharedListen = (s.stt as? SttSelection.Model)?.ref?.takeIf { it.usableForCalls() }
 
     fun run(action: suspend () -> CallActionResult) {

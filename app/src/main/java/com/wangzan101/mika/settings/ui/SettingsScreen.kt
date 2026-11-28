@@ -148,7 +148,7 @@ fun SettingsScreen(
     /** 别处的「去暂停页」(如助手已暂停的提示)直接打开「暂停 Mika」页。 */
     openPause: Boolean = false,
     onPauseOpened: () -> Unit = {},
-    /** 模型下的子页(用量、语音输入、朗读、通话方式、语音服务、图片/视频模型),由 Activity 路由打开。 */
+    /** Subpages under Models (usage, voice input, read-aloud, call mode, voice services, image/video models), opened by the Activity router. */
     onOpenModelRoute: ((SettingsModelRoute) -> Unit)? = null,
 ) {
     val configs by store.configs.collectAsState()
@@ -269,7 +269,7 @@ fun SettingsScreen(
     // Developer options are only listed in debug and performance-test builds: in release builds every switch gets its default fixed by the evaluation results.
     // Proactive capabilities are not in there: the entry is on the settings home page, present in every build, and off by default
     val showDeveloper = com.wangzan101.mika.record.DetailedTraces.supportedBuild
-    // 顶栏返回按钮和系统返回键都回到上一层(见 parent()),不要在子页里另写一份;离开时丢掉还没用掉的定位请求
+    // The top bar's back button and the system back key both return to the parent layer (see parent()); do not repeat this per subpage; drop unused focus requests on leaving
     val back: () -> Unit = { focusHost.clear(); page = page.parent() }
 
     if (page != SettingsPage.Home) BackHandler { back() }
@@ -290,7 +290,7 @@ fun SettingsScreen(
         if (status.sdkInt >= 36) add(SettingsRequirement.LiveTaskUpdates)
     }
     val openSearchResult: (SettingsDestination) -> Unit = { d ->
-        // 每次跳转先丢掉上一次没用掉的定位请求,只有页内条目才发新的
+        // Every jump first drops the previous unused focus request; only in-page entries issue a new one
         focusHost.clear()
         when (d) {
             is SettingsDestination.Page -> {

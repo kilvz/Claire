@@ -112,7 +112,7 @@ class PluginRegistry(
         if (next != stored) writeRegistry(next)
     }
 
-    /** 安装器成功把目录换入后登记;同 id 升级保留原来的启用状态和安装时间。 */
+    /** Registers after the installer swaps the directory in; an upgrade with the same id keeps the original enabled state and install time. */
     fun install(record: PluginRecord) = synchronized(lock) {
         val old = _plugins.value.firstOrNull { it.id == record.id }
         val merged = record.copy(

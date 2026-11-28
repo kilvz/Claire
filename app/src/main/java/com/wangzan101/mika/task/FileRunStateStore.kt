@@ -49,7 +49,7 @@ class FileRunStateStore(private val file: File) : RunStore {
     }
 
     @Synchronized override fun save(record: StoredRun) {
-        // 先写盘再改内存(和送达账本一样):写失败时内存仍和盘上一致
+        // Write to disk before updating memory (same as the delivery ledger): a failed write leaves memory consistent with disk
         val next = LinkedHashMap(records).apply { put(record.id, record) }
         file.parentFile?.mkdirs()
         val json = JsonArray(next.values.map { r -> buildJsonObject {

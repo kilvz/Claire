@@ -51,13 +51,13 @@ sealed class VoiceModelError(
     class Cancelled(cause: Throwable? = null) :
         VoiceModelError(VoiceErrorCategory.CANCELLED, "Voice operation cancelled", cause)
 
-    /** 选中的(或备援链里的)本机语音包没装、文件不全,或清单里已经没有它;界面提示「需要下载」。 */
+    /** The selected (or fallback-chain) on-device pack is not installed, its files are incomplete, or it is gone from the manifest; the UI shows "Needs download". */
     class PackMissing(val packId: String) :
         VoiceModelError(VoiceErrorCategory.INCOMPLETE_CONFIG, "Voice pack is not installed: $packId")
 
     /**
-     * 本机识别失败(文件损坏、内存不足、超时、设备跑不了、模型被释放)。原因链里不带服务商错误([ModelError]):
-     * [VoiceFailover.canTryNext] 先看原因链里的 ModelError,本机失败不能被当成网络错误。
+     * On-device recognition failed (corrupt files, out of memory, timeout, unsupported device, model released). The cause chain carries no provider error ([ModelError]):
+     * [VoiceFailover.canTryNext] checks the cause chain for ModelError first, and an on-device failure must not be treated as a network error.
      */
     class OnDeviceFailed(detail: String, cause: Throwable? = null) :
         VoiceModelError(VoiceErrorCategory.SYSTEM_UNAVAILABLE, detail, cause?.takeUnless(::hasModelError))
@@ -101,7 +101,7 @@ sealed class VoiceModelError(
             else -> Protocol(VoiceErrorCategory.PROTOCOL_ERROR, detailOf(error), error)
         }
 
-        /** 本机识别的失败:文件不在是「需要下载」,其余都是本机不可用(都换下一个,见 [VoiceFailover])。 */
+        /** On-device recognition failure: missing files mean "Needs download", everything else means on-device is unavailable (both move to the next, see [VoiceFailover]). */
         fun from(error: OnDeviceSttException, packId: String): VoiceModelError = when (error.kind) {
             OnDeviceSttException.Kind.Missing -> PackMissing(packId)
             OnDeviceSttException.Kind.Corrupt,

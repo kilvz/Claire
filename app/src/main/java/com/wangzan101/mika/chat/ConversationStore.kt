@@ -83,7 +83,7 @@ class ConversationStore(
     @Synchronized
     private fun updateUsage(id: String, change: (ConversationUsage) -> ConversationUsage) {
         var changed = applyUsageUpdate(id, change)
-        // 前台派出的子任务运行在隐藏子会话里,同步把用量和最近一次主模型请求记回所属前台对话。
+        // Subtasks launched from the foreground run in a hidden child conversation, so usage and the latest main-model request are mirrored back to the owning foreground conversation.
         if (hiddenDeskChild(id)) {
             deskParent(id)?.takeIf { it != safe(id) }?.let { parent ->
                 if (applyUsageUpdate(parent, change)) changed = true
@@ -579,9 +579,9 @@ class ConversationStore(
     }
 
     /**
-     * 这个对话下一次任务开局用的主模型。自己单独选过就用自己的;前台派出的子对话没选过时跟着所属前台对话,
-     * 选择还没写进旁文件时先认那一份(和前台取模型时一样)。都没有时为 null,跟随全局。
-     * 不往子对话写旁文件:子对话藏在前台对话下,写了的话这些配置会被 [referencedModelConfigIds] 一直算作在用。
+     * The main model this conversation uses when its next task starts. Use its own choice when set; a child conversation launched from the foreground follows its owning foreground conversation when it has none,
+     * and the side file is consulted while the choice has not been written yet (same as resolving a model in the foreground). Null when neither exists, following the global setting.
+     * No side file is written for child conversations: a child is hidden under its foreground conversation, and writing one would keep these configs counted as in use by [referencedModelConfigIds] forever.
      */
     fun runMainChoice(conversationId: String): ModelChoice? {
         settings(conversationId).main?.let { return it }

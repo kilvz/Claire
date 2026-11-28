@@ -42,21 +42,21 @@ Missing candidates, ambiguous parameters, low probabilities, errors and timeouts
 
 ## Speech to text
 
-按住说话时用的第四个用途，在「设置 › 模型 › 语音输入」里选。默认用手机自带的语音识别，边说边出字，不花钱。手机没有、或认不准时，可以选服务商的语音模型：说完再转成字，用你的额度；列表里只列名字像语音模型的，没列出来的可以在每家下面手动填模型名。选的时候会先试转一小段静音，通了才选上，不通当场说原因。手机自带的识别如果按住后一直没有反应，Mika 会提示你来这里选一个，不会自己换成要花钱的模型。
+The fourth role, chosen under **Settings › Models › Voice input**. By default it uses the phone's built-in recognition, which shows words as you speak and costs nothing. When the phone has none, or recognizes poorly, you can pick a provider's speech model: it transcribes after you stop and uses your quota; the list shows only models whose names look like speech models, and you can type any other model name under its provider. Selecting one first transcribes a short silent clip, and only selects it when that succeeds; otherwise it says why on the spot. If the built-in recognizer never responds after you press and hold, Claire prompts you to choose one here and never switches to a paid model on its own.
 
-### 离线语音包
+### Offline voice packs
 
-手机没有能用的自带识别、又不想用服务商的语音模型时，可以下载一个离线语音包：识别在手机上完成，不联网也能按住说话，声音不离开手机，也不花额度。
+When the phone has no usable built-in recognition and you do not want a provider's speech model, download an offline voice pack: recognition runs on the phone, push-to-talk works without a network, the audio never leaves the phone, and it uses no quota.
 
-- **在哪里**：「设置 › 模型 › 语音输入 › 离线语音包」。每个语音包一张卡片，写着能识别的语言、大小和许可；推荐给你界面语言的那个排在最前，标着「推荐」。只支持 64 位 ARM（arm64）手机，别的手机会写明不支持。
-- **下载**：点「下载」。来源依次是你在「关于」里设的 GitHub 镜像（开着时）、Mika 的发布页、模型的原始仓库（HuggingFace，固定版本）；走「设置 › 网络代理」。用移动数据或热点时会先问一句、写明大小。可以随时取消，之后再下。
-- **从文件导入**：手机上下不动、或者完全离线时，点「复制下载地址」，在电脑上把这些文件下好（打成一个 zip，或者分别选几个文件都行），拷到手机上，再点「从文件导入」选它们。
-- **不管下载还是导入，每个文件都要和 App 里自带的大小、校验值对上**才会装上；对不上会说是哪个文件。
-- **占多少空间**：SenseVoice Small 约 240 MB，Dolphin Base 约 104 MB，Whisper Base 约 161 MB，Whisper Small 约 375 MB；下载、导入前要多留 50 MB 左右的空余。语音包不进备份，换手机或从备份恢复后要重新下载，之前的选择会留着、标「需要下载」，下好就能直接用。
-- **怎么用上**：语音转文字选「自动」时，手机自带识别能用就仍然用它；用不了才用装好的语音包，先用推荐给这次识别语言的，没有就用装好的任意一个。也可以在列表里直接选它（标「本机 · 离线」），或者把它放进备援链的最后，云端模型连不上时由它接手。离线识别是说完再出字，不会边说边出。
-- **通话不用语音包**：应用内通话和 AI 接打电话的听写仍用原来的识别方式，选择列表里也不显示语音包。
-- **繁体中文**：选繁体中文时，识别出来的字目前是简体。
-- 删除语音包时，如果语音输入正选着它，会回到「自动」。
+- **Where**: **Settings › Models › Voice input › Offline voice packs**. Each pack has a card showing the languages it recognizes, its size and its license; the pack recommended for your UI language is listed first and marked "Recommended". Only 64-bit ARM (arm64) phones are supported, and other phones say so.
+- **Download**: tap **Download**. Sources are tried in order: the GitHub mirror you set under **About** (when enabled), Claire's release page, then the model's original repository (HuggingFace, pinned version); downloads go through **Settings › Network proxy**. On mobile data or a hotspot Claire first asks and states the size. You can cancel at any time and download later.
+- **Import from file**: when the phone cannot download, or is fully offline, tap **Copy download address**, fetch the files on a computer (as a zip or as individual files), copy them to the phone, then tap **Import from file** and select them.
+- **Every file, whether downloaded or imported, must match the size and checksum bundled with the app** before it is installed; a mismatch names the file.
+- **Space**: Whisper Base takes about 161 MB; leave roughly 50 MB free before downloading or importing. Voice packs are not included in backups, so after switching phones or restoring a backup they must be downloaded again; the previous selection is kept, marked "Needs download", and works as soon as the pack is installed.
+- **How it is used**: with speech-to-text set to "Auto", the built-in recognizer is still used when it works; only when it cannot be used does Claire fall back to an installed pack, preferring the one recommended for this recognition language and otherwise any installed pack. You can also select a pack directly in the list (marked "On-device · Offline"), or put it at the end of the fallback chain so it takes over when a cloud model cannot be reached. Offline recognition produces text after you stop, not while speaking.
+- **Calls do not use voice packs**: in-app calls and AI phone calls keep their existing dictation, and the selection lists do not show voice packs.
+- **Traditional Chinese**: selecting Traditional Chinese currently produces Simplified Chinese text.
+- Deleting a voice pack while voice input has it selected returns the selection to "Auto".
 
 ## Sign in with an account (no key needed)
 

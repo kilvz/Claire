@@ -35,9 +35,9 @@ object CapsuleEdge {
         (if (side == DockSide.Left) area.edgeLeft + room else area.width - area.edgeRight + room).coerceAtLeast(0)
 
     /**
-     * 藏起来时窗口摆在哪儿:窗口一直是一颗那么大([extra] 是比半圆宽出来的那截),整块往屏幕外挪出这一截,
-     * 只留半圆贴在实边上。屏幕外那部分点不到,不会挡住下面的 App;窗口尺寸从头到尾不变,
-     * 拖出来时只挪位置,系统不会跑窗口缩放过渡,胶囊从第一帧就跟手。
+     * Where the window sits while hidden: the window always stays the size of the ball ([extra] is the part wider than the half-circle), and the whole window moves off-screen by that much,
+     * leaving only the half-circle against the actual edge. The off-screen part cannot be tapped and does not block the app below; the window size never changes,
+     * and pulling it out only moves it, with no system window-scale transition, so the capsule tracks the finger from the first frame.
      */
     fun tuckedOffset(side: DockSide, area: DockArea, room: Int, extra: Int): Int = offset(side, area, room) - extra
 }

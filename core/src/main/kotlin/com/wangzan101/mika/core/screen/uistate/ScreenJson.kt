@@ -7,7 +7,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 object ScreenJson {
-    /** observe 的元素数组;center 换成与 tap 坐标相同的 0–999(像素只在端口内部用);bounds 换成 size=[宽,高](同一网格,省两个冗余角坐标);返回数组与被截掉的元素数。 */
+    /** observe's element array; center becomes 0–999 like tap coordinates (pixels stay inside the port); bounds becomes size=[width,height] (same grid, saving two redundant corner coordinates); returns the array and the number of dropped elements. */
     fun elements(s: ScreenSnapshot, maxElements: Int): Pair<JsonArray, Int> {
         val all = s.elements.filter { it.meaningful }
         val arr = buildJsonArray {

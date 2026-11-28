@@ -74,8 +74,8 @@ internal fun CapsuleController.CapsuleOverlay() {
         else shown.copy(kind = n.kind, text = n.text, detail = null, count = 0, needCount = 0, pill = true, widthEpoch = -n.id)
     if (edgeHidden) {
         MikaTheme(reduceMotion = animationsOff(context)) {
-            // 窗口和一颗一样大,藏起来时整块挪到屏幕外,只留下贴着实边的那 20dp 半圆:
-            // 换状态时窗口尺寸不变,系统就不会跑窗口缩放过渡(那会让胶囊先钉在边上、过一会儿才跟手)
+            // The window is the size of the ball and moves off-screen while hidden, leaving only the 20dp half-circle against the actual edge:
+            // keeping the window size fixed across states stops the system from running a window-scale transition (which pins the capsule to the edge for a moment before it tracks the finger)
             Box(
                 Modifier.size(CapsuleController.BALL_DP.dp),
                 contentAlignment = if (dock.side == DockSide.Right) Alignment.CenterStart else Alignment.CenterEnd,
@@ -91,8 +91,8 @@ internal fun CapsuleController.CapsuleOverlay() {
     }
     val talking = talk.active && !talk.released
     MikaTheme(reduceMotion = animationsOff(context)) {
-        // 收起时放收起动效,播完才换成贴边半圆([finishTuck]);[tuckPending] 那一帧也别把一颗再放出来。
-        // 从半圆拖出来这一下直接到位(instant)
+        // Play the tuck animation while collapsing and switch to the edge half-circle only when it ends ([finishTuck]); do not show the full ball again on the [tuckPending] frame either.
+        // Pulling out of the half-circle jumps straight to the final state (instant)
         OverlayMotion(open = !tucking && !tuckPending, origin = { TransformOrigin(if (dock.side == DockSide.Right) 1f else 0f, 0.5f) },
             onClosed = { finishTuck() }, instant = revealInstant) {
             CapsuleContent(

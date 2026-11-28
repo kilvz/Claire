@@ -131,7 +131,7 @@ fun PhoneOpsScreen(
             GroupLabel(stringResource(R.string.phone_transport_title))
             GroupCard {
                 Box(Modifier.fillMaxWidth().focusHighlightTarget(SettingsFocusKey.SHELL_TRANSPORT)) {
-                    // 固定三选一,和其它页面一样用分段控件
+                    // Always one of three, using a segmented control like other pages
                     val options = listOf(
                         ShellTransport.Auto to stringResource(R.string.phone_transport_auto),
                         ShellTransport.WirelessDebugging to stringResource(R.string.phone_transport_wireless),

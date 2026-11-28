@@ -245,7 +245,7 @@ class VoicePlayer(private val context: Context) {
             if (!tickets.owns(ticket)) return
             file = f
             val mp = MediaPlayer()
-            // 设置数据源等抛异常时 mp 还没交给 player,不在这里释放就漏掉原生播放器
+            // When setting the data source throws, mp has not been handed to the player yet; without releasing it here the native player leaks
             try {
                 mp.apply {
                     setAudioAttributes(attributes)

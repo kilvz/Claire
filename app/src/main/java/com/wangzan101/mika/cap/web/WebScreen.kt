@@ -206,7 +206,7 @@ class WebScreen(
         val tab = currentTab()?.takeIf { !it.crashed && borrowed(it) } ?: return withContext(Dispatchers.IO) { host.latestFramePng() }
         val bmp = viewFrame(tab) ?: return null
         return withContext(Dispatchers.IO) {
-            // 压缩抛异常时也要回收位图
+            // Recycle the bitmap even when compression throws
             try {
                 java.io.ByteArrayOutputStream().use { out ->
                     bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)

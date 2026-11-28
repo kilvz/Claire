@@ -217,7 +217,7 @@ internal class ExportProcessor(
             selection = selection,
             content = content,
         )
-        // 先复制资产再渲染：缺失、过大、读不出的警告在复制时才产生，要一并写进文档。
+        // Copy assets before rendering: missing, oversized and unreadable warnings only appear during copying and must be written into the document too.
         val warnings = built.warnings.toMutableList()
         if (copyAssets) copyAssets(built, assets, staging, warnings, onProgress)
         val document = built.copy(warnings = warnings.toList())

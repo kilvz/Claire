@@ -168,7 +168,7 @@ internal fun VoiceOptionList(
     onTest: (VoiceOption) -> Unit,
     pickable: (VoiceOption) -> Boolean = { true },
     extraTop: (@Composable () -> Unit)? = null,
-    /** 名字下面额外的一个提醒标签(比如本机语音包的「需要下载」);null 是没有。 */
+    /** Extra reminder badge under the name (such as "Needs download" for an on-device pack); null means none. */
     badge: (VoiceOption) -> String? = { null },
 ) {
     val probes by viewModel.probes.collectAsState()
@@ -256,8 +256,8 @@ internal fun VoicePickerSheet(
 }
 
 /**
- * 试转失败时给用户看的一句:本机语音包的失败换成该怎么办(没装是「需要下载」,文件坏了是「已损坏,请重新下载」,其余是「请重试」),
- * 不露英文的原因;别的照旧是服务商的原话。
+ * One line shown to the user when a test transcription fails: on-device pack failures become what to do (not installed is "Needs download", corrupt files are "Damaged, download again", the rest is "Try again"),
+ * never exposing the English reason; everything else still shows the provider's own words.
  */
 @Composable
 internal fun voiceErrorText(error: VoiceModelError): String = when (error) {

@@ -557,7 +557,7 @@ internal object MemoryRequests {
     }
 }
 
-/** 词的起点。否定词(не、no / não、sin、sem、ga、jangan)也只认词首:「мне」「teléfono」「Wisconsin」「precisem」「juga」「tunjangan」的词尾和它们同形,不是否定。 */
+/** Word start. Negative words (не, no / não, sin, sem, ga, jangan) also match only at the word start: the endings of "мне", "teléfono", "Wisconsin", "precisem", "juga" and "tunjangan" look the same but are not negations. */
 private const val W0 = "(?<!\\p{L})"
 
 private const val W1 = "(?!\\p{L})"
@@ -586,7 +586,7 @@ private const val KO_UPDATE_WORDS = "수정|변경|편집|업데이트|갱신|�
 
 private const val KO_DELETE_WORDS = "삭제|제거|지우|지워|없애|버리|버려|까먹"
 
-/** 「안」前面不加词首限定:不空格的「그건안지워도 돼」也要算否定。 */
+/** No word-start restriction before "안": the unspaced "그건안지워도 돼" also counts as a negation. */
 private fun koNegated(verbs: String) =
     "(?:$verbs)(?:하)?\\s*지\\s*(?:마|말|않)|안\\s*(?:$verbs)|" +
         "(?:$verbs)(?:을|를|은|는|할)?\\s*(?:안|못)\\s*(?:해|하|할|하고|했다|할게|할래|해도|한다|된)|" +
@@ -673,7 +673,7 @@ private const val FA_KEEP =
 private const val VI_KEEP =
     "giữ\\s+(?:lại|nguyên|đi|nó|cho)|cứ\\s+để\\s+nguyên|để\\s+nguyên|đừng\\s+(?:động|đụng)\\s+vào|đừng\\s+làm\\s+gì|cứ\\s+giữ|vẫn\\s+giữ"
 
-/** 「tidak」和它口语里的各种写法,只认词首。enggak、ngga、ngak、kagak 这些原先靠词尾的 gak、ga 认出,所以逐个列出。 */
+/** "tidak" and its colloquial spellings match only at the word start. enggak, ngga, ngak and kagak were previously recognized by the endings gak and ga, so they are listed individually. */
 private const val ID_NOT = "${W0}(?:tidak|enggak|engga|engak|enga|nggak|ngga|ngak|nga|kagak|kaga|gak|ga)"
 
 /** 「jangan」和动词之间只放行这几个宾语;「jangan lupa」(别忘了)里的 lupa 不在其中,是让它记。 */

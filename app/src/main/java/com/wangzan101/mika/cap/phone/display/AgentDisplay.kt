@@ -49,8 +49,8 @@ class AgentDisplay(
     val frames: StateFlow<Bitmap?> = _frames.asStateFlow()
 
     private val frameLock = Any()
-    private var fullFrame: Bitmap? = null // 带行填充的整帧,宽 = rowStride / pixelStride
-    private var scratch: ByteBuffer? = null // 缓冲比整帧短时垫用,只在帧线程上动
+    private var fullFrame: Bitmap? = null // Full frame with row padding; width = rowStride / pixelStride
+    private var scratch: ByteBuffer? = null // Padding buffer used when shorter than the full frame; touched only on the frame thread
     private var hasFrame = false
     private var frameGeometry = DisplayFrameGeometry(bufferWidth, bufferHeight, Surface.ROTATION_0)
     private var lastProcessedAt = 0L
@@ -153,7 +153,7 @@ class AgentDisplay(
                     bmp = Bitmap.createBitmap(strideWidth, bufferHeight, Bitmap.Config.ARGB_8888)
                     fullFrame = bmp
                 }
-                // 最后一行可能不带填充,缓冲比整块位图短:直接拷会抛异常,copyStridedFrame 先垫等长的缓冲
+                // The last row may carry no padding, leaving the buffer shorter than the whole bitmap: copying directly throws, so copyStridedFrame pads a buffer of the needed length first
                 scratch = copyStridedFrame(bmp!!, plane.buffer, scratch)
                 hasFrame = true
                 // Rate limiting or thread scheduling delays consumption, so the moment the bitmap was copied must not be recorded as the frame time.

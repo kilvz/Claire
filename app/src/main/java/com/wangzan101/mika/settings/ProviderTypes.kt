@@ -230,7 +230,7 @@ data class RoleChoices(
         is RoleChoice.Group, RoleChoice.Off, null -> null
     }
 
-    /** 两个用途是否解析到同一条配置或同一个模型组;任一用途没配时不算相同。 */
+    /** Whether two roles resolve to the same config or the same model group; not the same when either role is unset. */
     fun sameModel(first: ModelRole, second: ModelRole): Boolean {
         resolveConfig(first)?.let { return it == resolveConfig(second) }
         val g = resolveGroup(first) ?: return false

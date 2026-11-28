@@ -43,8 +43,8 @@ class CascadeEngine(private val context: Context, private val environment: Voice
     }
 
     /**
-     * 通话听写用哪个模型。手机自带识别听不到通话的声音;本机语音包第一版也不用(出字太慢,
-     * 比如 Whisper 5 秒语音要 4 秒左右),只有它们时得到 [StandardBlocker.NoListenModel]。
+     * Which model call dictation uses. The system recognizer cannot hear call audio, and the first version of on-device packs is not used either (output is too slow:
+     * Whisper takes about 4 seconds for 5 seconds of speech), so when only those exist the result is [StandardBlocker.NoListenModel].
      */
     fun listenRef(use: CallUse): VoiceModelRef? {
         val shared = (selections.stt as? SttSelection.Model)?.ref
@@ -53,7 +53,7 @@ class CascadeEngine(private val context: Context, private val environment: Voice
             CallUse.InApp -> shared
             CallUse.Phone -> when (val own = selections.callStt) {
                 null -> shared
-                // AI 电话自己选的是语音包:照实说没有可用的,不悄悄改用语音输入那一个
+                // The AI call itself selected a voice pack: report that none is available rather than silently using the voice-input one
                 else -> own.takeUnless(OnDeviceCatalog::isOnDevice)
             }
         }
@@ -110,7 +110,7 @@ class CascadeEngine(private val context: Context, private val environment: Voice
         val think = thinkModel() ?: throw VoiceModelError.IncompleteConfig("No chat model")
         // When the selected model is the one used for read-aloud/voice input, carry its fallback chain (see backupsFor); a model chosen separately for AI calls carries none
         val tts = environment.tts.createSpeaker(context, speakRef, TtsCapabilities())
-        // 备援链里的本机语音包通话也不用
+        // On-device packs in the fallback chain are not used for calls either
         val listenBackups = environment.stt.backupsFor(listen).filterNot(OnDeviceCatalog::isOnDevice)
         val voice = voice(use)
         val speed = VoiceSettings.get(context).state.value.speed.takeIf { it > 0f && it != 1f }

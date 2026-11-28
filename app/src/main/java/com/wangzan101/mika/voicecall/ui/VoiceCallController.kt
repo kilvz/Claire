@@ -450,7 +450,7 @@ class VoiceCallDeps(
     val screens: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
     /** The live picture of that task's (conversation id's) screen; null when nothing is running. */
     val frames: (String) -> StateFlow<Bitmap?>? = { null },
-    /** 对话用量计量器;标准模式通话记入这条对话。 */
+    /** Conversation usage meter; standard-mode calls are recorded against this conversation. */
     val meter: (String) -> com.wangzan101.mika.core.model.usage.ConversationMeter? = { null },
 )
 

@@ -5,11 +5,11 @@ import com.wangzan101.mika.settings.ui.SettingsDestination.ModelRoute
 import com.wangzan101.mika.settings.ui.SettingsDestination.Page
 
 /**
- * 设置搜索能找到的页面和页内条目。顺序就是同分时的先后,按设置首页从上到下、再到各级子页排。
+ * Pages and in-page entries that settings search can find. The order is the tie-break order: down the settings home, then through each subpage.
  *
- * 加了新的设置子页([SettingsPage]),在这里登记一条,或者在 [unindexedPages] 写明为什么不登记;
- * `SettingsSearchIndexTest` 会核对两边。条目的标题、所在位置和同义选项都用设置里本来的字符串资源,
- * 所以 13 种界面语言自动跟上,不另写关键词。
+ * When adding a settings subpage ([SettingsPage]), register an entry here or explain in [unindexedPages] why it is not registered;
+ * `SettingsSearchIndexTest` checks both sides. Entry titles, locations and synonym options all use the original settings string resources,
+ * so all 13 UI languages follow automatically without separate keywords.
  */
 internal object SettingsSearchIndex {
     private val MODEL = R.string.settings_model

@@ -67,7 +67,7 @@ interface SttAdapter {
      */
     fun utterance(context: Context, model: ResolvedVoiceModel, language: String?): UtteranceTranscribe? = null
 
-    /** 按下说话时提前准备(本机识别在后台加载模型);备援链开会话不经 [start],由它补上。默认不做事。 */
+    /** Prepare early when push-to-talk starts (on-device recognition loads the model in the background); sessions opened by the fallback chain skip [start] and are covered here. Does nothing by default. */
     fun prewarm(model: ResolvedVoiceModel) {}
 }
 

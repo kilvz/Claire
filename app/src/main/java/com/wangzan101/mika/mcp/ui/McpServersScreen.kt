@@ -32,17 +32,17 @@ import com.wangzan101.mika.ui.theme.MikaIcons
 import kotlinx.coroutines.launch
 import com.wangzan101.mika.memory.ui.Link
 
-/** 设置 › MCP 服务器:连接外部 MCP server(outbound),和「连接电脑」的 inbound 设置分开。 */
+/** Settings › MCP servers: connects external MCP servers (outbound), separate from the inbound settings under "Connect computer". */
 @Composable
 fun McpServersScreen(store: McpServerStore, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val connector = remember { McpConnectorState(store, store.catalog, scope) }
     var route by remember { mutableStateOf(McpRoute.List) }
     var editing by remember { mutableStateOf<McpServerConfig?>(null) }
-    // 「自定义服务器」是从列表还是目录进来的:返回时回原来那一级
+    // Whether "Custom server" was opened from the list or the catalog, so back returns to that layer
     var customFrom by remember { mutableStateOf(McpRoute.List) }
 
-    // 系统返回键和顶栏返回按钮走同一条路:逐级回到上一层,到了列表才离开这一页
+    // The system back key and the top bar's back button share one path: step back one layer at a time and leave the page only from the list
     val back: () -> Unit = {
         if (route == McpRoute.Connect) connector.cancel()
         if (route == McpRoute.Manage) editing = null

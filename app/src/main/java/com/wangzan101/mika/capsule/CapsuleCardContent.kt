@@ -206,7 +206,7 @@ fun CapsuleCard(
 @Composable
 fun OverlayMotion(
     open: Boolean, origin: (Size) -> TransformOrigin, onClosed: () -> Unit, onOpened: () -> Unit = {},
-    /** 这一下直接到位、不动效:从贴边半圆出来的一颗要跟手,等它淡入、放大看着像卡住。 */
+    /** Jump straight to the final state without animation: the ball pulled from the edge half-circle must track the finger, and waiting for a fade-in and scale-up looks stuck. */
     instant: Boolean = false,
     content: @Composable () -> Unit,
 ) {

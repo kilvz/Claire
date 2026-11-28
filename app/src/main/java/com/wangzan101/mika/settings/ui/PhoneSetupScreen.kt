@@ -647,7 +647,7 @@ private fun PillButton(text: String, primary: Boolean, tag: String? = null, onCl
 
 // ---------- Settings page "Advanced" ----------
 
-// ---------- 对话页 ----------
+// ---------- Chat page ----------
 
 /** One line below a task card when the task needs the phone but phone control is not ready. */
 @Composable

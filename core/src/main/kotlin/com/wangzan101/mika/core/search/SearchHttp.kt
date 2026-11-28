@@ -19,8 +19,8 @@ internal object SearchHttp {
     fun json(body: JsonObject): RequestBody = JsonHttp.json(body)
 
     /**
-     * 密钥里有请求头放不下的字符时直接给模型一个鉴权失败:不然 OkHttp 抛的异常信息会带上整段密钥。
-     * 合法时返回 null。
+     * When the key contains characters a request header cannot hold, fail authentication directly for the model: otherwise OkHttp's exception message would carry the whole key.
+     * Returns null when valid.
      */
     fun unusableKey(key: String): WebSearchResult.Failure? =
         if (ApiKeyText.isHeaderLegal(key)) null

@@ -106,8 +106,8 @@ class OpenAiSpeechTtsAdapter(
 }
 
 /**
- * 请求里没带音色时,用 [voice]:一般是这个模型自己记着的那个(接入时填的)。自己部署的服务各有各的音色名,不带就被拒;
- * 用户在朗读页选过音色的,请求里带着,照用户选的。[voice] 为空时原样不动。
+ * When the request has no voice, use [voice]: usually the one this model remembers (entered when it was connected). Self-hosted services have their own voice names and reject requests without one;
+ * when the user picked a voice on the read-aloud page the request carries it and the user's choice wins. When [voice] is blank nothing changes.
  */
 internal fun withDefaultVoice(delegate: TtsModel, voice: String): TtsModel {
     val default = voice.trim()
@@ -148,7 +148,7 @@ class GeminiTtsAdapter(
                 headers = (model.account as? ResolvedAccount.ExistingProvider)?.headers.orEmpty(),
             )
         }
-        // 这个协议的请求必须带音色。模型没记音色的(从对话账号接入的),用它音色表的第一个
+        // Requests on this protocol must carry a voice. When the model remembers none (connected from a chat account), use the first entry in its voice table
         val voice = binding.voice.ifBlank { VoiceVoices.tts(model.model).firstOrNull().orEmpty() }
         return categorized(withDefaultVoice(delegate, voice))
     }

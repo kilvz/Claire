@@ -174,8 +174,8 @@ object ModelsCopy {
     }
 
     /**
-     * 列模型没成的原因。[ListFailure] 自带的文字只有中文,这里按失败类型取当前界面语言的资源;地址不合法、Key 的字符、
-     * 代理的两种失败和已有的说法是同一件事,直接复用。带细节时仍是「原因(细节)」,细节(服务端或系统的原话)不翻译。
+     * Why listing models failed. [ListFailure]'s own text is Chinese-only, so pick a resource in the current UI language by failure type; invalid URLs, bad key characters
+     * and the two proxy failures match existing wording and are reused directly. With details it stays "reason (detail)", and the detail (the server's or system's own words) is not translated.
      */
     fun listFailure(r: ModelListResult.Failed): String {
         val reason = when (r.reason) {
@@ -195,7 +195,7 @@ object ModelsCopy {
         return if (r.detail.isEmpty()) reason else "$reason(${r.detail})"
     }
 
-    // ---------- 用账号登录(xAI、OpenRouter;ChatGPT 的在上面) ----------
+    // ---------- Sign in with an account (xAI, OpenRouter; ChatGPT is above) ----------
 
     val SIGN_IN_GROUP: String get() = tr(R.string.signin_group)
     val KEY_GROUP: String get() = tr(R.string.signin_key_group)

@@ -29,7 +29,7 @@ object VoiceFallbacks {
         SttProtocol.AzureShortAudio,
         SttProtocol.TencentSentence,
         SttProtocol.XfyunDictation,
-        // 本机语音包也是松手后整段转写:能当链头,也能当云端模型的备援
+        // On-device packs also transcribe the whole recording after release, so they can lead the chain or back up a cloud model
         SttProtocol.OnDevice,
     )
 

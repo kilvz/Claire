@@ -232,7 +232,7 @@ private fun MigratedSpeechModelContent(
     val context = LocalContext.current
     val environment = remember { VoiceModelEnvironment.get(context) }
     val voiceVm = rememberVoiceCatalogViewModel(environment)
-    // 文件可能在别处被删(或下好了):回到这一页时重看「需要下载」
+    // Files may have been deleted elsewhere (or finished downloading): recheck "Needs download" when returning to this page
     val resumed = rememberResumeCount()
     val packsAvailable = remember { environment.hasRunnableVoicePacks() }
     val catalog = requireNotNull(ui.sttCatalog)

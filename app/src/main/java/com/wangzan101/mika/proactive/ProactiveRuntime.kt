@@ -369,7 +369,7 @@ class ProactiveRuntime(
         else -> SourceTier.Mid
     }
 
-    /** 记下档位(状态流先改,串行协程上的事后做:它们读的是改好的值)。 */
+    /** Records the tier (the state flow changes first; the serial coroutine catches up afterwards and reads the updated value). */
     private fun storeTier(packageName: String, tier: SourceTier) {
         val high = if (tier == SourceTier.High) _learnHigh.value + packageName else _learnHigh.value - packageName
         prefs.learnHigh = high
