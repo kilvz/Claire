@@ -2302,7 +2302,7 @@ class ChatViewModelTest {
         assertEquals("Remembered: 用户点外卖不要香菜", vm.noteText(note))
         // 内容现取:那条删掉后写「一条已删除的记忆」
         items.value = items.value.filter { it.id != "a" }
-        assertEquals("Remembered: 一条已删除的记忆", vm.noteText(note))
+        assertEquals("Remembered: a deleted memory", vm.noteText(note))
         // 重新打开对话时从存下的那一轮读回(只存了种类和编号)
         val store = ConversationStore(tmp.newFolder())
         store.append("c2", Turn("点外卖", "ok", "succeeded", runId = "r2", memoryNotes = listOf(remembered), usedMemory = listOf("a")))
