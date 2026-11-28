@@ -68,6 +68,16 @@ class DeskBrainTest {
     }
 
     @Test
+    fun checkIsAddedAsAMikaNoteAboutTheLastReply() = runBlocking {
+        val model = FakeModel("")
+        LlmBrain(model, "rules", emptyList()).check("Your last reply promised work", Recorder())
+        val last = model.seen.single().last()
+        assertEquals(Role.User, last.role)
+        assertEquals(Author.Mika, last.author)
+        assertEquals("[check] Your last reply promised work", last.text())
+    }
+
+    @Test
     fun seedPutsPriorTurnsBeforeFirstReply() = runBlocking {
         val model = FakeModel()
         val brain = LlmBrain(model, "rules", emptyList())

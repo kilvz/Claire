@@ -9,6 +9,7 @@ import com.wangzan101.mika.core.agent.UserWords
 import com.wangzan101.mika.core.frontdesk.DESK_RESULT_MAX_CHARS
 import com.wangzan101.mika.core.frontdesk.DeskBrain
 import com.wangzan101.mika.core.frontdesk.DeskEvent
+import com.wangzan101.mika.core.frontdesk.DeskPromise
 import com.wangzan101.mika.core.frontdesk.DeskReport
 import com.wangzan101.mika.core.frontdesk.DeskSurface
 import com.wangzan101.mika.core.frontdesk.DeskToolExecutor
@@ -407,11 +408,26 @@ internal class DeskChatOps(
         val reply = StringBuilder()
         val tasks = mutableListOf<String>()
         var failure: String? = null
+        var acted = false
         try {
             prepare(brain)
             current = UserWords.saidToDesk(text).ifBlank { null }
             withContext(vm.store.meter(conversationId)) {
-                brain.reply(text, context(runId, reply, tasks, executor(words)))
+                brain.reply(text, context(runId, reply, tasks, executor(words)) { acted = true })
+            }
+            // A reply can promise work ("On it, I'll …") without any tool taking effect; nothing runs, and the user
+            // only sees the promise. Give the model one silent turn in which only starting or changing work counts.
+            if (!acted && DeskPromise.pending(reply)) {
+                try {
+                    withContext(vm.store.meter(conversationId)) {
+                        brain.check(DeskPromise.CHECK_NOTE,
+                            context(runId, StringBuilder(), tasks, executor(words), silent = true) { acted = true })
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // The reply already went out; a failed correction leaves the promise as it was.
+                }
             }
         } catch (e: CancellationException) {
             current = null
@@ -432,8 +448,16 @@ internal class DeskChatOps(
         persist(Turn(text, spoken, DeskTurn.STATUS, note = failure, runId = runId, atMs = startedAt, deskTasks = tasks))
     }
 
-    private fun context(runId: String, reply: StringBuilder, tasks: MutableList<String>, exec: DeskToolExecutor) = object : ReplyContext {
+    private fun context(
+        runId: String,
+        reply: StringBuilder,
+        tasks: MutableList<String>,
+        exec: DeskToolExecutor,
+        silent: Boolean = false,
+        onTool: () -> Unit = {},
+    ) = object : ReplyContext {
         override suspend fun say(delta: String) {
+            if (silent) return
             reply.append(delta)
             val now = reply.toString()
             update(runId) { it.copy(deskReply = now) }
@@ -441,7 +465,7 @@ internal class DeskChatOps(
 
         override suspend fun callTool(name: String, arguments: JsonObject): JsonObject {
             val result = exec.execute(name, arguments)
-            val status = result.string("status")
+            val status = result.string("status").orEmpty()
             val taskId = result.string("task_id")
             if (name == DeskTools.DISPATCH && taskId != null && (status == "started" || status == "queued")) {
                 tasks += taskId
@@ -449,6 +473,9 @@ internal class DeskChatOps(
             } else if (name != DeskTools.DISPATCH && status == "ok") {
                 toolLabel(name, arguments.string("task_id"))?.let { label -> update(runId) { it.copy(deskTool = label) } }
             }
+            // Only a call that actually took effect counts as having done something: a rejected or failed dispatch
+            // still leaves a promise with nothing behind it.
+            if (status in TAKEN) onTool()
             return result
         }
     }
@@ -532,5 +559,8 @@ internal class DeskChatOps(
     companion object {
         /** The run id prefix for a front desk turn (see [DeskTurn.RUN_PREFIX]): used only to identify this turn; there is no run record to view. */
         const val RUN_PREFIX = DeskTurn.RUN_PREFIX
+
+        /** Result statuses that mean a tool call actually changed something; anything else leaves the promise unfulfilled. */
+        private val TAKEN = setOf("started", "queued", "already_dispatched", "ok")
     }
 }

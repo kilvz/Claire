@@ -133,13 +133,16 @@ class DeskChatOpsTest {
     private class ScriptBrain(
         val onReply: suspend (String, ReplyContext) -> Unit,
         val onNotice: suspend (String, ReplyContext) -> Unit = { _, _ -> },
+        val onCheck: suspend (String, ReplyContext) -> Unit = { _, _ -> },
     ) : DeskBrain {
         val replies = mutableListOf<String>()
         val notices = mutableListOf<String>()
+        val checks = mutableListOf<String>()
         val seeded = mutableListOf<List<Turn>>()
         override suspend fun reply(userText: String, ctx: ReplyContext) { replies += userText; onReply(userText, ctx) }
         override suspend fun lateResult(name: String, result: JsonObject, ctx: ReplyContext) {}
         override suspend fun notice(text: String, ctx: ReplyContext) { notices += text; onNotice(text, ctx) }
+        override suspend fun check(note: String, ctx: ReplyContext) { checks += note; onCheck(note, ctx) }
         override fun remember(assistantText: String) {}
         override fun seed(prior: List<Turn>) { seeded += prior }
     }
@@ -262,6 +265,58 @@ class DeskChatOpsTest {
         assertEquals(listOf("child-1"), h.store.turns("c").single().deskTasks)
         // No cards inside the conversation: a leading time row, then the words and the front-desk reply
         assertEquals(listOf("t0", "u0", "r0"), chatItemKeys(h.vm.ui.value.exchanges, kept = null, phoneSetupRow = null, hasBlocked = false))
+    }
+
+    @Test fun promiseWithoutADispatchGetsOneSilentTurnThatStartsTheTask() = runTest {
+        val brain = ScriptBrain(
+            { _, ctx -> ctx.say("On it — I'll set the switch to off now.") },
+            onCheck = { _, ctx -> ctx.callTool(DeskTools.DISPATCH, dispatch("set the switch to off", "Set Wi-Fi auto-on off")) },
+        )
+        val h = harness(brain)
+        h.vm.openConversation("c")
+        runCurrent()
+        assertTrue(h.vm.send("set the switch to off", ok))
+        runCurrent()
+        // The reply called no tool, so one corrective turn ran and started the work the promise named
+        assertEquals(1, brain.checks.size)
+        assertEquals(listOf("set the switch to off"), h.port.dispatched)
+        val ex = h.vm.ui.value.exchanges.single()
+        assertEquals(listOf("child-1"), ex.deskTasks)
+        // Only the promise is shown; the corrective turn cannot add text
+        assertEquals("On it — I'll set the switch to off now.", ex.deskReply)
+        assertEquals(listOf("child-1"), h.store.turns("c").single().deskTasks)
+    }
+
+    @Test fun aRejectedDispatchStillGetsTheCorrectiveTurn() = runTest {
+        val brain = ScriptBrain(
+            { _, ctx ->
+                // Paraphrased words are not the user's, so the dispatch is rejected and nothing runs
+                ctx.callTool(DeskTools.DISPATCH, dispatch("turn off Wi-Fi auto-on", "Set Wi-Fi auto-on off"))
+                ctx.say("On it — I'll set the switch to off now.")
+            },
+            onCheck = { _, ctx -> ctx.callTool(DeskTools.DISPATCH, dispatch("set the switch to off", "Set Wi-Fi auto-on off")) },
+        )
+        val h = harness(brain)
+        h.vm.openConversation("c")
+        runCurrent()
+        assertTrue(h.vm.send("set the switch to off", ok))
+        runCurrent()
+        // A rejected call is not work: the promise still gets its one corrective turn, which copies the exact words
+        assertEquals(1, brain.checks.size)
+        assertEquals(listOf("set the switch to off"), h.port.dispatched)
+        assertEquals(listOf("child-1"), h.vm.ui.value.exchanges.single().deskTasks)
+    }
+
+    @Test fun aPlainAnswerGetsNoCorrectiveTurn() = runTest {
+        val brain = ScriptBrain({ _, ctx -> ctx.say("Your Wi-Fi is on but not connected; the hotspot switch is off.") })
+        val h = harness(brain)
+        h.vm.openConversation("c")
+        runCurrent()
+        assertTrue(h.vm.send("what's wrong with my hotspot", ok))
+        runCurrent()
+        assertTrue(brain.checks.isEmpty())
+        assertTrue(h.port.dispatched.isEmpty())
+        assertEquals("Your Wi-Fi is on but not connected; the hotspot switch is off.", h.vm.ui.value.exchanges.single().deskReply)
     }
 
     @Test fun quotedMikaTextIsNotTheUserWords() = runTest {

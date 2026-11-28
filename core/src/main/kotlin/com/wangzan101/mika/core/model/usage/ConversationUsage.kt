@@ -64,6 +64,7 @@ data class RequestComposition(
                                             }
                                         }
                                         part.text.startsWith(LlmBrain.UPDATE_PREFIX) -> runtime += size
+                                        part.text.startsWith(LlmBrain.CHECK_PREFIX) -> runtime += size
                                         LlmBrain.isLateResultNote(part.text) -> toolsAndMedia += size
                                         else -> dialogue += size
                                     }

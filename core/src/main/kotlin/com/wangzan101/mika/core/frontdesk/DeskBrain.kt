@@ -44,6 +44,13 @@ interface DeskBrain {
     /** Something worth telling the user unprompted (a backend task moved on); it is added as a note and answered as a new turn. */
     suspend fun notice(text: String, ctx: ReplyContext)
 
+    /**
+     * One corrective turn after a reply promised work but started none: [note] is written by code, not by the user.
+     * The caller ignores any text this turn produces; only its tool calls take effect. Brains that do not
+     * implement a special note handle it like [notice].
+     */
+    suspend fun check(note: String, ctx: ReplyContext) = notice(note, ctx)
+
     /** Something the assistant said verbatim (greeting, closing line). */
     fun remember(assistantText: String)
 
@@ -87,6 +94,12 @@ class LlmBrain(
 
     override suspend fun notice(text: String, ctx: ReplyContext) {
         addUser(UPDATE_PREFIX + text, Author.Mika)
+        run(ctx)
+    }
+
+    /** A note about the last reply, not news and not the user's words: it may only start or change work. */
+    override suspend fun check(note: String, ctx: ReplyContext) {
+        addUser(CHECK_PREFIX + note, Author.Mika)
         run(ctx)
     }
 
@@ -244,6 +257,8 @@ class LlmBrain(
     companion object {
         /** Opens a status note the app hands the brain between user turns. */
         const val UPDATE_PREFIX = "[update] "
+        /** Opens a note about the assistant's own last reply (work it promised but did not start). */
+        const val CHECK_PREFIX = "[check] "
         private const val LATE_RESULT_MARK = " result arrived] "
 
         /** The note a tool result that finished after its turn arrives as. */
